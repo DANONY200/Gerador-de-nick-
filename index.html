@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Nicks para Minecraft</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gerador de Nicks</h1>
+            <p>by pxzy - Versão Web</p>
+        </header>
+
+        <main>
+            <div class="card" id="settings-card">
+                <h2>Configurações</h2>
+                <div class="form-group">
+                    <label for="amount">Quantidade de Nicks:</label>
+                    <input type="number" id="amount" placeholder="Ex: 10" value="5">
+                </div>
+                <div class="form-group">
+                    <label for="length">Tamanho do Nick (4-16):</label>
+                    <input type="number" id="length" placeholder="Ex: 6" value="6">
+                </div>
+                <div class="form-group">
+                    <label for="first-letter">Primeira Letra (opcional):</label>
+                    <input type="text" id="first-letter" placeholder="Ex: a" maxlength="1">
+                </div>
+                <div class="form-group">
+                    <label for="charset">Conjunto de Caracteres:</label>
+                    <select id="charset">
+                        <option value="letters">Apenas Letras</option>
+                        <option value="letters_digits">Letras e Números</option>
+                        <option value="all">Letras (Maiúsculas/Minúsculas) e Números</option>
+                        <option value="digits">Apenas Números</option>
+                    </select>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="use-underscore">
+                    <label for="use-underscore">Usar Underscore (_)</label>
+                </div>
+            </div>
+
+            <div class="card" id="controls-card">
+                <h2>Controles</h2>
+                <div class="button-grid">
+                    <button id="start-btn" class="btn btn-primary">Iniciar</button>
+                    <button id="stop-btn" class="btn btn-secondary" disabled>Parar</button>
+                    <button id="copy-btn" class="btn">Copiar Nicks</button>
+                    <button id="download-btn" class="btn">Baixar .txt</button>
+                </div>
+            </div>
+
+            <div class="card" id="results-card">
+                <h2>Resultados</h2>
+                <div class="status-bar">
+                    <p id="status-text">Pronto para iniciar...</p>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
+                <ul id="results-log">
+                    </ul>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
