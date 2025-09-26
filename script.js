@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const copyBtn = document.getElementById('copy-btn');
-    const clearLogsBtn = document.getElementById('clear-logs-btn');
     
     const amountInput = document.getElementById('amount');
     const lengthInput = document.getElementById('length');
@@ -12,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const underscoreCheck = document.getElementById('use-underscore');
     
     const nicksList = document.getElementById('nicks-list');
-    const logBox = document.getElementById('log-box');
 
     let isRunning = false;
     let foundNicks = [];
@@ -23,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     stopBtn.addEventListener('click', stopGeneration);
-    clearLogsBtn.addEventListener('click', clearLogs);
     copyBtn.addEventListener('click', copyNicksToClipboard);
     
     function startGeneration() {
@@ -38,17 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         isRunning = true;
         updateUI(true);
-        clearLogs();
-        logMessage("--- Iniciando a geração de nicks ---");
-        logMessage("AVISO: Se nada acontecer, verifique o console (F12) para erros de CORS.", "warning");
-
+        clearResults();
         runRealApiGeneration();
     }
     
     function stopGeneration() {
         if (!isRunning) return;
         isRunning = false;
-        logMessage("\n--- Geração interrompida pelo usuário. ---");
         updateUI(false);
     }
 
@@ -58,21 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
         [amountInput, lengthInput, firstLetterInput, charsetSelect, underscoreCheck].forEach(el => el.disabled = running);
     }
 
-    function clearLogs() {
-        logBox.textContent = '';
+    function clearResults() {
         nicksList.innerHTML = '';
         foundNicks = [];
     }
     
-    function logMessage(message, className = '') {
-        const span = document.createElement('span');
-        span.className = `log-message ${className}`;
-        span.innerHTML = message;
-        logBox.appendChild(span);
-        logBox.appendChild(document.createTextNode('\n'));
-        logBox.scrollTop = logBox.scrollHeight;
-    }
-
     function addFoundNick(nick) {
         foundNicks.push(nick);
         const li = document.createElement('li');
@@ -103,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return response.status === 404;
         } catch (error) {
             console.error(`Erro ao checar Ashcon para ${nick}:`, error);
-            logMessage(`  <span class="taken">Erro de rede ao checar Ashcon. (Provavelmente CORS)</span>`);
             return false;
         }
     }
@@ -115,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return data.success === false && data.error_code === 404;
         } catch (error) {
             console.error(`Erro ao checar Mush para ${nick}:`, error);
-            logMessage(`  <span class="taken">Erro de rede ao checar Mush. (Provavelmente CORS)</span>`);
             return false;
         }
     }
@@ -137,27 +118,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 nick = generateNick(options);
             } while (seenNicks.has(nick));
             seenNicks.add(nick);
-
-            logMessage(`Gerado: <span class="nick">${nick}</span>`);
             
             const isAshconAvailable = await checkAshcon(nick);
-            logMessage(`  - Ashcon: ${isAshconAvailable ? '<span class="available">✅ Disponível</span>' : '<span class="taken">❌ Indisponível</span>'}`);
-
             const isMushAvailable = await checkMush(nick);
-            logMessage(`  - Mush: ${isMushAvailable ? '<span class="available">✅ Disponível</span>' : '<span class="taken">❌ Indisponível</span>'}`);
-            logMessage("----------------------------------------");
 
             if (isMushAvailable && isAshconAvailable) {
                 generatedCount++;
                 addFoundNick(nick);
             }
-            
-            await new Promise(resolve => setTimeout(resolve, 300));
         }
         
-        if (isRunning) {
-            logMessage(`\n--- Concluído. ${generatedCount} nicks válidos encontrados. ---`);
-        }
         isRunning = false;
         updateUI(false);
     }
