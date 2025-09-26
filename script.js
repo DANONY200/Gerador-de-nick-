@@ -8,24 +8,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsList = document.getElementById('results-list');
     const copyAllButton = document.getElementById('copy-all-button');
 
-    // Mapeamento de caracteres para geração
     const CHARSETS = {
         'letters': 'abcdefghijklmnopqrstuvwxyz',
         'digits': '0123456789',
         'letters_digits': 'abcdefghijklmnopqrstuvwxyz0123456789',
-        'all': 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*-_' 
+        'all': 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' // Removidos símbolos problemáticos para nicks
     };
 
     let availableNicks = [];
-    // Define o número de checagens a serem feitas em paralelo a cada rodada.
     const BATCH_SIZE = 10; 
     let isRunning = false;
-    const generatedNicksSet = new Set(); // Para evitar checar o mesmo nick duas vezes
+    const generatedNicksSet = new Set(); 
 
     /**
-     * Gera um nickname aleatório com base nas configurações. (Função inalterada)
+     * Gera um nickname aleatório com base nas configurações.
      */
     function generateNick(length, firstLetter, charsetType, useUnderscore) {
+        // [Lógica de geração inalterada para manter a funcionalidade original]
         let chars = CHARSETS[charsetType];
         let base = '';
 
@@ -50,30 +49,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * SIMULAÇÃO: Checa a disponibilidade do nick. (Função inalterada)
-     * @returns {Promise<boolean>} 
+     * INTEGRAÇÃO REAL DA API: Função que seu back-end precisa implementar.
+     * Esta função agora fará a chamada para o seu servidor proxy.
+     * * SEU BACK-END DEVE:
+     * 1. Receber o 'nick'.
+     * 2. Chamar a API Ashcon: `https://api.ashcon.app/mojang/v2/user/{nick}`
+     * 3. Chamar a API Mush: `https://mush.com.br/api/player/{nick}`
+     * 4. Retornar TRUE apenas se AMBAS retornarem status 404 (Disponível).
+     * * @param {string} nick - O nickname a ser checado.
+     * @returns {Promise<boolean>} Promessa que resolve para true se disponível, false caso contrário.
      */
     async function checkAvailability(nick) {
-        // SIMULAÇÃO DE LATÊNCIA DA REDE
-        await new Promise(resolve => setTimeout(resolve, 500)); 
+        // --- SUBSTITUIÇÃO DA SIMULAÇÃO POR CHAMADA REAL (VIA PROXY) ---
+        try {
+            // OBS: Você precisa configurar este endpoint no seu servidor
+            const response = await fetch(`/api/check-nick?nick=${nick}`, {
+                method: 'GET',
+                // Use a linha abaixo se o seu back-end estiver em outro domínio
+                // mode: 'cors', 
+            });
 
-        if (/(.)\1/.test(nick.toLowerCase()) || nick.includes('test')) {
+            if (!response.ok) {
+                // Se o servidor de back-end falhar (ex: 500 Internal Error)
+                console.error(`Back-end retornou erro para ${nick}: ${response.status}`);
+                return false; 
+            }
+
+            const data = await response.json();
+            
+            // Esperamos que o back-end retorne { isAvailable: true/false }
+            return data.isAvailable === true;
+
+        } catch (error) {
+            // Erro de rede ou CORS se o proxy não estiver configurado corretamente
+            console.error(`Erro de rede ou proxy ao checar ${nick}:`, error);
             return false;
         }
-        
-        if (nick.toLowerCase().endsWith('pro') || nick.toLowerCase().endsWith('vip')) {
-            return false;
-        }
-
-        return true; 
+        // --- FIM DA CHAMADA VIA PROXY ---
     }
 
     /**
-     * Renderiza o resultado de um nick na lista. (Função inalterada)
+     * Renderiza o resultado de um nick na lista.
      */
     function renderNick(nick, isAvailable) {
         const item = document.createElement('div');
-        item.classList.add('nick-item');
+        item.classList.add('nick-item', isAvailable ? 'available' : 'taken');
         
         const nickElement = document.createElement('span');
         nickElement.classList.add('nick-name');
@@ -81,33 +101,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const statusElement = document.createElement('span');
         statusElement.classList.add('status-check');
+        statusElement.textContent = isAvailable ? '✅ DISPONÍVEL' : '❌ INDISPONÍVEL';
+        statusElement.style.color = isAvailable ? 'var(--success-color)' : 'var(--danger-color)';
         
         const copyButton = document.createElement('button');
         copyButton.classList.add('copy-nick-btn');
-        copyButton.innerHTML = '<i class="fas fa-clipboard"></i>';
+        copyButton.innerHTML = '<i class="fas fa-clipboard"></i> Copiar';
         copyButton.addEventListener('click', () => copyToClipboard(nick));
 
+        item.appendChild(nickElement);
+        item.appendChild(statusElement);
+        item.appendChild(copyButton);
+
+        // Adiciona disponíveis no topo e indisponíveis no final
         if (isAvailable) {
-            statusElement.textContent = '✅ DISPONÍVEL';
-            statusElement.style.color = 'var(--primary-color)';
-            item.appendChild(nickElement);
-            item.appendChild(statusElement);
-            item.appendChild(copyButton);
-            resultsList.prepend(item);
+            resultsList.prepend(item); 
         } else {
-            statusElement.textContent = '❌ INDISPONÍVEL';
-            statusElement.style.color = 'var(--danger-color)';
-            item.style.opacity = '0.5';
-            item.appendChild(nickElement);
-            item.appendChild(statusElement);
-            item.appendChild(copyButton);
-            resultsList.appendChild(item);
+            resultsList.appendChild(item); 
         }
     }
 
-    /**
-     * Função auxiliar para copiar texto para a área de transferência. (Função inalterada)
-     */
+    // [Funções auxiliares de cópia e reset inalteradas]
     function copyToClipboard(text) {
         navigator.clipboard.writeText(text)
             .then(() => {
@@ -119,9 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
-    /**
-     * Restaura o botão de geração.
-     */
     function resetButton() {
         generateButton.disabled = false;
         generateButton.innerHTML = '<i class="fas fa-magic"></i> Gerar Nicks';
@@ -129,10 +140,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Manipulador principal do botão de geração.
+     * Manipulador principal do botão de geração com verificação paralela.
      */
     generateButton.addEventListener('click', async () => {
-        if (isRunning) return; // Previne cliques múltiplos
+        if (isRunning) return; 
         isRunning = true;
 
         // 1. Configuração inicial
@@ -140,9 +151,9 @@ document.addEventListener('DOMContentLoaded', () => {
         availableNicks = [];
         copyAllButton.disabled = true;
         
-        resultsList.innerHTML = '<p class="placeholder-text">Gerando e verificando, aguarde...</p>';
+        resultsList.innerHTML = '<p class="placeholder-text">Gerando e verificando... Conectando ao servidor proxy.</p>';
         generateButton.disabled = true;
-        generateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+        generateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando e Checando...';
 
         const amount = parseInt(amountInput.value);
         const length = parseInt(lengthInput.value);
@@ -159,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let foundCount = 0;
         let attempts = 0;
-        const maxAttempts = amount * 10; // Limite de tentativas para geração
+        const maxAttempts = amount * 10; 
 
         // 2. Loop principal de Geração em Lotes e Checagem Paralela
         while (foundCount < amount && attempts < maxAttempts) {
@@ -171,27 +182,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 let newNick = generateNick(length, firstLetter, charsetType, useUnderscore);
                 attempts++;
                 
-                // Garante que o nick não foi gerado/checado antes
                 if (!generatedNicksSet.has(newNick)) {
                     generatedNicksSet.add(newNick);
                     batchNicks.push(newNick);
                 } else {
-                    i--; // Tenta gerar outro se houver repetição
+                    i--; 
                 }
             }
 
-            if (batchNicks.length === 0) continue; // Sai se não gerou nada novo
+            if (batchNicks.length === 0) continue; 
 
-            // Cria um array de Promises (checa todos os nicks do lote em paralelo)
+            // Checa todos os nicks do lote em paralelo (usando Promise.all)
             const checkPromises = batchNicks.map(nick => 
                 checkAvailability(nick).then(isAvailable => ({ nick, isAvailable }))
             );
             
-            // Espera que todas as checagens do lote terminem
             const results = await Promise.all(checkPromises);
             
-            // Processa os resultados do lote
+            // Processa os resultados
             results.forEach(({ nick, isAvailable }) => {
+                // A renderização é feita sequencialmente para manter a ordem de logs/visibilidade
                 renderNick(nick, isAvailable);
                 if (isAvailable) {
                     availableNicks.push(nick);
@@ -199,10 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Se atingimos a quantidade desejada, encerra.
             if (foundCount >= amount) break;
             
-            // Dê um pequeno respiro para o navegador entre os lotes (opcional, mas bom para UX)
+            // Pequeno respiro
             await new Promise(resolve => setTimeout(resolve, 50)); 
         }
         
@@ -216,9 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resetButton();
     });
 
-    /**
-     * Manipulador do botão de copiar todos. (Função inalterada)
-     */
     copyAllButton.addEventListener('click', () => {
         if (availableNicks.length > 0) {
             const allNicks = availableNicks.join('\n');
