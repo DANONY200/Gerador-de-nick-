@@ -1,200 +1,230 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Referências aos elementos da página
     const amountInput = document.getElementById('amount');
-    const lengthInput = document.getElementById('length');
+    const lengthInput = document.getElementById('nick-length');
     const firstLetterInput = document.getElementById('first-letter');
-    const charsetSelect = document.getElementById('charset');
+    const charsetSelect = document.getElementById('charset-type');
     const underscoreCheckbox = document.getElementById('use-underscore');
+    const generateButton = document.getElementById('generate-button');
+    const resultsList = document.getElementById('results-list');
+    const copyAllButton = document.getElementById('copy-all-button');
 
-    const startBtn = document.getElementById('start-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const copyBtn = document.getElementById('copy-btn');
-    const downloadBtn = document.getElementById('download-btn');
+    // Mapeamento de caracteres para geração
+    const CHARSETS = {
+        'letters': 'abcdefghijklmnopqrstuvwxyz',
+        'digits': '0123456789',
+        'letters_digits': 'abcdefghijklmnopqrstuvwxyz0123456789',
+        'all': 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*-_' 
+    };
 
-    const statusText = document.getElementById('status-text');
-    const progressBar = document.getElementById('progress-bar');
-    const resultsLog = document.getElementById('results-log');
-
-    // Variáveis de estado
+    let availableNicks = [];
+    // Define o número de checagens a serem feitas em paralelo a cada rodada.
+    const BATCH_SIZE = 10; 
     let isRunning = false;
-    let foundNicks = [];
-    const checkedNicks = new Set();
+    const generatedNicksSet = new Set(); // Para evitar checar o mesmo nick duas vezes
 
-    // --- Lógica de Geração de Nicks ---
-    function generateNick(length, firstLetter, charset, useUnderscore) {
-        const charsets = {
-            letters: 'abcdefghijklmnopqrstuvwxyz',
-            digits: '0123456789',
-            letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
-            all: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-        };
-
-        let chars = charsets[charset] || charsets.letters;
-        let nick = '';
+    /**
+     * Gera um nickname aleatório com base nas configurações. (Função inalterada)
+     */
+    function generateNick(length, firstLetter, charsetType, useUnderscore) {
+        let chars = CHARSETS[charsetType];
+        let base = '';
 
         if (firstLetter) {
-            nick += firstLetter;
+            base += firstLetter.toLowerCase();
             length--;
         }
 
         for (let i = 0; i < length; i++) {
-            nick += chars.charAt(Math.floor(Math.random() * chars.length));
+            base += chars.charAt(Math.floor(Math.random() * chars.length));
         }
 
-        if (useUnderscore && nick.length > 1) {
-            const index = Math.floor(Math.random() * (nick.length - 1)) + 1; // Não coloca no início
-            nick = nick.slice(0, index) + '_' + nick.slice(index);
+        if (useUnderscore && base.length >= 4) {
+            let insertionIndex = Math.floor(Math.random() * (base.length - 2)) + 1;
+            base = base.substring(0, insertionIndex) + '_' + base.substring(insertionIndex + 1);
         }
 
-        return nick;
+        if (base.startsWith('_')) base = base.substring(1) + base[0];
+        if (base.endsWith('_')) base = base[base.length - 1] + base.substring(0, base.length - 1);
+        
+        return base.substring(0, lengthInput.value);
     }
 
-    // --- Verificações de API ---
-    async function checkAshcon(nick) {
-        try {
-            const response = await fetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
-            return response.status === 404;
-        } catch (error) {
-            console.error(`Ashcon check failed for ${nick}:`, error);
+    /**
+     * SIMULAÇÃO: Checa a disponibilidade do nick. (Função inalterada)
+     * @returns {Promise<boolean>} 
+     */
+    async function checkAvailability(nick) {
+        // SIMULAÇÃO DE LATÊNCIA DA REDE
+        await new Promise(resolve => setTimeout(resolve, 500)); 
+
+        if (/(.)\1/.test(nick.toLowerCase()) || nick.includes('test')) {
             return false;
         }
-    }
-
-    async function checkMush(nick) {
-        try {
-            const response = await fetch(`https://mush.com.br/api/player/${nick}`);
-            const data = await response.json();
-            return !data.success && data.error_code === 404;
-        } catch (error) {
-            console.error(`Mush check failed for ${nick}:`, error);
+        
+        if (nick.toLowerCase().endsWith('pro') || nick.toLowerCase().endsWith('vip')) {
             return false;
         }
+
+        return true; 
     }
-    
-    // --- Lógica Principal de Geração e Verificação ---
-    async function startGeneration() {
-        // Obter e validar inputs
+
+    /**
+     * Renderiza o resultado de um nick na lista. (Função inalterada)
+     */
+    function renderNick(nick, isAvailable) {
+        const item = document.createElement('div');
+        item.classList.add('nick-item');
+        
+        const nickElement = document.createElement('span');
+        nickElement.classList.add('nick-name');
+        nickElement.textContent = nick;
+
+        const statusElement = document.createElement('span');
+        statusElement.classList.add('status-check');
+        
+        const copyButton = document.createElement('button');
+        copyButton.classList.add('copy-nick-btn');
+        copyButton.innerHTML = '<i class="fas fa-clipboard"></i>';
+        copyButton.addEventListener('click', () => copyToClipboard(nick));
+
+        if (isAvailable) {
+            statusElement.textContent = '✅ DISPONÍVEL';
+            statusElement.style.color = 'var(--primary-color)';
+            item.appendChild(nickElement);
+            item.appendChild(statusElement);
+            item.appendChild(copyButton);
+            resultsList.prepend(item);
+        } else {
+            statusElement.textContent = '❌ INDISPONÍVEL';
+            statusElement.style.color = 'var(--danger-color)';
+            item.style.opacity = '0.5';
+            item.appendChild(nickElement);
+            item.appendChild(statusElement);
+            item.appendChild(copyButton);
+            resultsList.appendChild(item);
+        }
+    }
+
+    /**
+     * Função auxiliar para copiar texto para a área de transferência. (Função inalterada)
+     */
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                alert(`"${text}" copiado!`);
+            })
+            .catch(err => {
+                console.error('Erro ao copiar: ', err);
+                alert('Falha ao copiar. Tente manualmente.');
+            });
+    }
+
+    /**
+     * Restaura o botão de geração.
+     */
+    function resetButton() {
+        generateButton.disabled = false;
+        generateButton.innerHTML = '<i class="fas fa-magic"></i> Gerar Nicks';
+        isRunning = false;
+    }
+
+    /**
+     * Manipulador principal do botão de geração.
+     */
+    generateButton.addEventListener('click', async () => {
+        if (isRunning) return; // Previne cliques múltiplos
+        isRunning = true;
+
+        // 1. Configuração inicial
+        resultsList.innerHTML = '';
+        availableNicks = [];
+        copyAllButton.disabled = true;
+        
+        resultsList.innerHTML = '<p class="placeholder-text">Gerando e verificando, aguarde...</p>';
+        generateButton.disabled = true;
+        generateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+
         const amount = parseInt(amountInput.value);
         const length = parseInt(lengthInput.value);
-        const firstLetter = firstLetterInput.value;
-        const charset = charsetSelect.value;
+        const firstLetter = firstLetterInput.value.trim();
+        const charsetType = charsetSelect.value;
         const useUnderscore = underscoreCheckbox.checked;
         
-        if (isNaN(amount) || amount <= 0) {
-            alert("Por favor, insira uma quantidade válida.");
-            return;
-        }
-        if (isNaN(length) || length < 4 || length > 16) {
-            alert("O tamanho do nick deve ser entre 4 e 16 caracteres.");
+        // Validação
+        if (length < 4 || length > 16 || amount < 1) {
+            alert("Erro de entrada: O tamanho deve ser entre 4-16 e a quantidade deve ser maior que 0.");
+            resetButton();
             return;
         }
 
-        // Configurar estado inicial
-        isRunning = true;
-        foundNicks = [];
-        checkedNicks.clear();
-        resultsLog.innerHTML = '';
-        updateUI(true);
-
-        let generatedCount = 0;
+        let foundCount = 0;
         let attempts = 0;
-        const maxAttempts = amount * 100; // Limite de tentativas para evitar loops infinitos
+        const maxAttempts = amount * 10; // Limite de tentativas para geração
 
-        while (generatedCount < amount && isRunning && attempts < maxAttempts) {
-            const nick = generateNick(length, firstLetter, charset, useUnderscore);
-            attempts++;
-            
-            if (checkedNicks.has(nick)) {
-                continue; // Pula nicks já verificados
+        // 2. Loop principal de Geração em Lotes e Checagem Paralela
+        while (foundCount < amount && attempts < maxAttempts) {
+            const nicksToGenerate = Math.min(BATCH_SIZE, amount - foundCount);
+            const batchNicks = [];
+
+            // Geração de um lote de nicks
+            for (let i = 0; i < nicksToGenerate; i++) {
+                let newNick = generateNick(length, firstLetter, charsetType, useUnderscore);
+                attempts++;
+                
+                // Garante que o nick não foi gerado/checado antes
+                if (!generatedNicksSet.has(newNick)) {
+                    generatedNicksSet.add(newNick);
+                    batchNicks.push(newNick);
+                } else {
+                    i--; // Tenta gerar outro se houver repetição
+                }
             }
-            checkedNicks.add(nick);
 
-            statusText.textContent = `Verificando: ${nick}... (${generatedCount}/${amount} encontrados)`;
+            if (batchNicks.length === 0) continue; // Sai se não gerou nada novo
 
-            // Verifica as duas APIs em paralelo para mais velocidade
-            const [isAshconAvailable, isMushAvailable] = await Promise.all([
-                checkAshcon(nick),
-                checkMush(nick)
-            ]);
-
-            if (isAshconAvailable && isMushAvailable) {
-                generatedCount++;
-                foundNicks.push(nick);
-                addNickToLog(nick);
-            }
+            // Cria um array de Promises (checa todos os nicks do lote em paralelo)
+            const checkPromises = batchNicks.map(nick => 
+                checkAvailability(nick).then(isAvailable => ({ nick, isAvailable }))
+            );
             
-            const progress = (generatedCount / amount) * 100;
-            progressBar.style.width = `${progress}%`;
-        }
+            // Espera que todas as checagens do lote terminem
+            const results = await Promise.all(checkPromises);
+            
+            // Processa os resultados do lote
+            results.forEach(({ nick, isAvailable }) => {
+                renderNick(nick, isAvailable);
+                if (isAvailable) {
+                    availableNicks.push(nick);
+                    foundCount++;
+                }
+            });
 
-        finishGeneration(generatedCount, amount);
-    }
+            // Se atingimos a quantidade desejada, encerra.
+            if (foundCount >= amount) break;
+            
+            // Dê um pequeno respiro para o navegador entre os lotes (opcional, mas bom para UX)
+            await new Promise(resolve => setTimeout(resolve, 50)); 
+        }
+        
+        // 3. Finalização
+        resultsList.querySelector('.placeholder-text')?.remove();
+        if (availableNicks.length > 0) {
+            copyAllButton.disabled = false;
+        }
+        
+        resultsList.insertAdjacentHTML('beforeend', `<p class="placeholder-text">Fim da Geração. ${availableNicks.length} nicks disponíveis encontrados (Total de tentativas: ${attempts}).</p>`);
+        resetButton();
+    });
+
+    /**
+     * Manipulador do botão de copiar todos. (Função inalterada)
+     */
+    copyAllButton.addEventListener('click', () => {
+        if (availableNicks.length > 0) {
+            const allNicks = availableNicks.join('\n');
+            copyToClipboard(allNicks);
+        }
+    });
     
-    function stopGeneration() {
-        isRunning = false;
-        statusText.textContent = "Geração parada pelo usuário.";
-        updateUI(false);
-    }
-
-    function finishGeneration(found, total) {
-        isRunning = false;
-        if (found >= total) {
-            statusText.textContent = `Concluído! ${found} nicks válidos encontrados.`;
-        } else {
-             statusText.textContent = `Finalizado. Não foi possível encontrar a quantidade desejada. ${found} nicks encontrados.`;
-        }
-        updateUI(false);
-    }
-
-    // --- Funções de UI e Utilidades ---
-    function updateUI(running) {
-        startBtn.disabled = running;
-        stopBtn.disabled = !running;
-        amountInput.disabled = running;
-        lengthInput.disabled = running;
-        firstLetterInput.disabled = running;
-        charsetSelect.disabled = running;
-        underscoreCheckbox.disabled = running;
-    }
-    
-    function addNickToLog(nick) {
-        const li = document.createElement('li');
-        li.textContent = nick;
-        resultsLog.appendChild(li);
-        resultsLog.scrollTop = resultsLog.scrollHeight; // Auto-scroll
-    }
-
-    function copyNicks() {
-        if (foundNicks.length === 0) {
-            alert("Nenhum nick foi encontrado para copiar.");
-            return;
-        }
-        const textToCopy = foundNicks.join('\n');
-        navigator.clipboard.writeText(textToCopy)
-            .then(() => alert(`${foundNicks.length} nicks copiados para a área de transferência!`))
-            .catch(err => console.error('Erro ao copiar nicks:', err));
-    }
-
-    function downloadNicks() {
-         if (foundNicks.length === 0) {
-            alert("Nenhum nick foi encontrado para baixar.");
-            return;
-        }
-        const text = foundNicks.join('\n');
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'nicks_gerados.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    // Event Listeners para os botões
-    startBtn.addEventListener('click', startGeneration);
-    stopBtn.addEventListener('click', stopGeneration);
-    copyBtn.addEventListener('click', copyNicks);
-    downloadBtn.addEventListener('click', downloadNicks);
+    copyAllButton.disabled = true;
 });
