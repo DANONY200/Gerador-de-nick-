@@ -1,20 +1,22 @@
 /* Estilo Global e Variáveis */
 :root {
-    --bg-color: #121212;
-    --card-bg: #1e1e1e;
-    --text-color: #ffffff;
-    --primary-color: #2ecc71; /* Verde Minecraft-like */
-    --primary-hover: #27ae60;
-    --danger-color: #e74c3c;
-    --border-color: #333333;
+    --bg-color: #0d1117; /* GitHub Dark */
+    --card-bg: #161b22;
+    --text-color: #c9d1d9;
+    --primary-color: #58a6ff; /* Ciano/Azul Limpo */
+    --primary-hover: #4c96e6;
+    --success-color: #3fb950; /* Verde de Sucesso */
+    --danger-color: #f85149;
+    --border-color: #30363d;
+    --input-bg: #0d1117;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
     margin: 0;
-    padding: 20px;
+    padding: 30px 20px;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -23,7 +25,7 @@ body {
 
 .container {
     width: 100%;
-    max-width: 600px;
+    max-width: 700px;
 }
 
 h1 {
@@ -31,57 +33,63 @@ h1 {
     color: var(--primary-color);
     margin-bottom: 5px;
     font-size: 2.5em;
+    font-weight: 700;
 }
 
 .subtitle {
     text-align: center;
-    color: #aaaaaa;
-    margin-bottom: 25px;
+    color: #8b949e;
+    margin-bottom: 35px;
+    font-size: 1.1em;
 }
 
 /* Cartões */
 .card {
     background-color: var(--card-bg);
     padding: 25px;
-    border-radius: 12px;
+    border-radius: 10px;
     margin-bottom: 25px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border-color);
 }
 
 .settings-card h2, .results-card h2 {
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--border-color);
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 10px;
     margin-bottom: 20px;
-    font-size: 1.5em;
+    font-size: 1.4em;
+    font-weight: 600;
 }
 
 /* Inputs e Seleções */
 .input-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 label {
     display: block;
-    margin-bottom: 5px;
-    font-weight: 600;
-    color: #cccccc;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.95em;
 }
 
 input[type="number"], input[type="text"], select {
     width: 100%;
-    padding: 12px;
+    padding: 10px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background-color: var(--bg-color);
+    border-radius: 6px;
+    background-color: var(--input-bg);
     color: var(--text-color);
     box-sizing: border-box;
-    transition: border-color 0.3s;
+    transition: border-color 0.2s;
+    font-size: 1em;
 }
 
 input:focus, select:focus {
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
     outline: none;
 }
 
@@ -101,15 +109,15 @@ input:focus, select:focus {
 /* Botões */
 .generate-btn {
     width: 100%;
-    padding: 15px;
+    padding: 12px;
     background-color: var(--primary-color);
-    color: var(--text-color);
+    color: var(--bg-color);
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     font-size: 1.1em;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.3s, transform 0.1s;
+    transition: background-color 0.2s, transform 0.1s;
 }
 
 .generate-btn:hover {
@@ -124,21 +132,27 @@ input:focus, select:focus {
     margin-right: 8px;
 }
 
+.generate-btn:disabled {
+    background-color: #3b5071;
+    cursor: not-allowed;
+}
+
+
 /* Lista de Resultados */
 .results-list {
-    min-height: 100px;
+    min-height: 120px;
     max-height: 400px;
     overflow-y: auto;
-    background-color: var(--bg-color);
-    padding: 10px;
-    border-radius: 8px;
+    background-color: var(--input-bg);
+    padding: 15px;
+    border-radius: 6px;
     border: 1px solid var(--border-color);
     margin-bottom: 15px;
 }
 
 .placeholder-text {
     text-align: center;
-    color: #666666;
+    color: #6a737d;
     padding: 30px 0;
 }
 
@@ -146,38 +160,45 @@ input:focus, select:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 8px;
     background-color: var(--card-bg);
     border-radius: 6px;
     transition: background-color 0.2s;
+    border-left: 3px solid transparent;
 }
 
-.nick-item:hover {
-    background-color: #2c2c2c;
+.nick-item.available {
+    border-left-color: var(--success-color);
+}
+
+.nick-item.taken {
+    border-left-color: var(--danger-color);
 }
 
 .nick-name {
     font-family: monospace;
     font-size: 1.1em;
-    font-weight: bold;
-    color: #ffffff;
+    font-weight: 700;
+    color: var(--text-color);
+    flex-grow: 1;
 }
 
 .status-check {
     font-size: 0.9em;
-    font-style: italic;
-    color: #888888;
+    font-weight: 500;
+    margin-right: 15px;
 }
 
 .copy-nick-btn {
-    padding: 8px 12px;
+    padding: 6px 10px;
     background-color: var(--primary-color);
-    color: var(--text-color);
+    color: var(--bg-color);
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color 0.2s;
+    font-size: 0.9em;
 }
 
 .copy-nick-btn:hover {
@@ -187,33 +208,39 @@ input:focus, select:focus {
 .copy-all-btn {
     width: 100%;
     padding: 12px;
-    background-color: #3498db; /* Azul para destaque */
-    color: var(--text-color);
+    background-color: var(--success-color);
+    color: var(--bg-color);
     border: none;
-    border-radius: 8px;
-    font-weight: bold;
+    border-radius: 6px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color 0.2s;
 }
 
 .copy-all-btn:hover:not(:disabled) {
-    background-color: #2980b9;
+    background-color: #2b9e3b;
 }
 
 .copy-all-btn:disabled {
-    background-color: #444444;
+    background-color: #3b5071;
     cursor: not-allowed;
 }
 
 /* Responsividade */
-@media (max-width: 650px) {
+@media (max-width: 768px) {
     body {
-        padding: 10px;
-    }
-    .card {
         padding: 15px;
     }
-    h1 {
-        font-size: 2em;
+    .nick-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .status-check {
+        margin-right: 0;
+        margin-top: 5px;
+    }
+    .copy-nick-btn {
+        margin-top: 10px;
+        align-self: flex-end;
     }
 }
