@@ -44,11 +44,6 @@ header h1 {
     font-size: 2em;
 }
 
-header p {
-    margin: 5px 0 0;
-    color: var(--text-secondary);
-}
-
 .input-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -130,12 +125,12 @@ button:active {
     background-color: var(--accent-hover);
 }
 
-#stop-btn, #clear-logs-btn, #copy-btn {
+#stop-btn, #copy-btn {
     background-color: var(--bg-light);
     color: var(--text-primary);
 }
 
-#stop-btn:hover, #clear-logs-btn:hover, #copy-btn:hover {
+#stop-btn:hover, #copy-btn:hover {
     background-color: #444;
 }
 
@@ -145,7 +140,7 @@ button:disabled {
     color: var(--text-secondary);
 }
 
-.results-section, .log-section {
+.results-section {
     margin-top: 20px;
 }
 
@@ -161,20 +156,16 @@ button:disabled {
     font-size: 1.2em;
 }
 
-#log-box, #nicks-list {
+#nicks-list {
     background-color: var(--bg-dark);
     border: 1px solid #444;
     border-radius: var(--border-radius);
     padding: 15px;
-    height: 150px;
+    height: 200px;
     overflow-y: auto;
     font-size: 0.9em;
     color: var(--text-secondary);
-}
-
-#nicks-list {
     list-style: none;
-    padding-left: 15px;
 }
 
 #nicks-list li {
@@ -185,15 +176,4 @@ button:disabled {
 }
 #nicks-list li:nth-child(odd) {
     background-color: rgba(40, 167, 69, 0.05);
-}
-
-.log-message .nick {
-    color: var(--text-primary);
-    font-weight: bold;
-}
-.log-message .available {
-    color: var(--success-color);
-}
-.log-message .taken {
-    color: var(--error-color);
 }
