@@ -1,22 +1,22 @@
-/* Estilo Global e Variáveis */
 :root {
-    --bg-color: #0d1117; /* GitHub Dark */
-    --card-bg: #161b22;
-    --text-color: #c9d1d9;
-    --primary-color: #58a6ff; /* Ciano/Azul Limpo */
-    --primary-hover: #4c96e6;
-    --success-color: #3fb950; /* Verde de Sucesso */
-    --danger-color: #f85149;
-    --border-color: #30363d;
-    --input-bg: #0d1117;
+    --bg-dark: #0a0a0a;
+    --bg-medium: #1a1a1a;
+    --bg-light: #2a2a2a;
+    --text-primary: #ffffff;
+    --text-secondary: #aaaaaa;
+    --accent-color: #cc0000;
+    --accent-hover: #ff1a1a;
+    --success-color: #28a745;
+    --error-color: #dc3545;
+    --border-radius: 8px;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
     margin: 0;
-    padding: 30px 20px;
+    padding: 20px;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -25,222 +25,175 @@ body {
 
 .container {
     width: 100%;
-    max-width: 700px;
-}
-
-h1 {
-    text-align: center;
-    color: var(--primary-color);
-    margin-bottom: 5px;
-    font-size: 2.5em;
-    font-weight: 700;
-}
-
-.subtitle {
-    text-align: center;
-    color: #8b949e;
-    margin-bottom: 35px;
-    font-size: 1.1em;
-}
-
-/* Cartões */
-.card {
-    background-color: var(--card-bg);
+    max-width: 600px;
+    background-color: var(--bg-medium);
+    border: 2px solid var(--accent-color);
+    border-radius: var(--border-radius);
     padding: 25px;
-    border-radius: 10px;
-    margin-bottom: 25px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-.settings-card h2, .results-card h2 {
-    color: var(--text-color);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-    font-size: 1.4em;
+header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+header h1 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 2em;
+}
+
+header p {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+}
+
+.input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.input-group {
+    margin-bottom: 15px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 5px;
     font-weight: 600;
 }
 
-/* Inputs e Seleções */
-.input-group {
-    margin-bottom: 20px;
-}
-
-label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: var(--text-color);
-    font-size: 0.95em;
-}
-
-input[type="number"], input[type="text"], select {
+input[type="number"],
+input[type="text"],
+select {
     width: 100%;
     padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: var(--input-bg);
-    color: var(--text-color);
-    box-sizing: border-box;
-    transition: border-color 0.2s;
+    background-color: var(--bg-light);
+    border: 1px solid #444;
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-family: 'Poppins', sans-serif;
     font-size: 1em;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 input:focus, select:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
     outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.4);
 }
 
-/* Checkbox */
 .checkbox-group {
     display: flex;
     align-items: center;
     margin-bottom: 20px;
 }
 
-.checkbox-group label {
-    margin-left: 10px;
-    margin-bottom: 0;
-    cursor: pointer;
+.checkbox-group input {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-color);
 }
 
-/* Botões */
-.generate-btn {
-    width: 100%;
+.button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+button {
     padding: 12px;
-    background-color: var(--primary-color);
-    color: var(--bg-color);
-    border: none;
-    border-radius: 6px;
-    font-size: 1.1em;
+    font-size: 1em;
     font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    border: none;
+    border-radius: var(--border-radius);
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s;
 }
 
-.generate-btn:hover {
-    background-color: var(--primary-hover);
+button:active {
+    transform: scale(0.98);
 }
 
-.generate-btn:active {
-    transform: scale(0.99);
+#start-btn {
+    background-color: var(--accent-color);
+    color: var(--text-primary);
 }
 
-.generate-btn i {
-    margin-right: 8px;
+#start-btn:hover {
+    background-color: var(--accent-hover);
 }
 
-.generate-btn:disabled {
-    background-color: #3b5071;
+#stop-btn, #clear-logs-btn, #copy-btn {
+    background-color: var(--bg-light);
+    color: var(--text-primary);
+}
+
+#stop-btn:hover, #clear-logs-btn:hover, #copy-btn:hover {
+    background-color: #444;
+}
+
+button:disabled {
+    background-color: #555;
     cursor: not-allowed;
+    color: var(--text-secondary);
 }
 
-
-/* Lista de Resultados */
-.results-list {
-    min-height: 120px;
-    max-height: 400px;
-    overflow-y: auto;
-    background-color: var(--input-bg);
-    padding: 15px;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    margin-bottom: 15px;
+.results-section, .log-section {
+    margin-top: 20px;
 }
 
-.placeholder-text {
-    text-align: center;
-    color: #6a737d;
-    padding: 30px 0;
-}
-
-.nick-item {
+.results-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px;
-    margin-bottom: 8px;
-    background-color: var(--card-bg);
-    border-radius: 6px;
-    transition: background-color 0.2s;
-    border-left: 3px solid transparent;
+    margin-bottom: 10px;
 }
 
-.nick-item.available {
-    border-left-color: var(--success-color);
+.results-header h2 {
+    margin: 0;
+    font-size: 1.2em;
 }
 
-.nick-item.taken {
-    border-left-color: var(--danger-color);
-}
-
-.nick-name {
-    font-family: monospace;
-    font-size: 1.1em;
-    font-weight: 700;
-    color: var(--text-color);
-    flex-grow: 1;
-}
-
-.status-check {
+#log-box, #nicks-list {
+    background-color: var(--bg-dark);
+    border: 1px solid #444;
+    border-radius: var(--border-radius);
+    padding: 15px;
+    height: 150px;
+    overflow-y: auto;
     font-size: 0.9em;
-    font-weight: 500;
-    margin-right: 15px;
+    color: var(--text-secondary);
 }
 
-.copy-nick-btn {
-    padding: 6px 10px;
-    background-color: var(--primary-color);
-    color: var(--bg-color);
-    border: none;
+#nicks-list {
+    list-style: none;
+    padding-left: 15px;
+}
+
+#nicks-list li {
+    padding: 5px;
     border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--success-color);
+}
+#nicks-list li:nth-child(odd) {
+    background-color: rgba(40, 167, 69, 0.05);
 }
 
-.copy-nick-btn:hover {
-    background-color: var(--primary-hover);
+.log-message .nick {
+    color: var(--text-primary);
+    font-weight: bold;
 }
-
-.copy-all-btn {
-    width: 100%;
-    padding: 12px;
-    background-color: var(--success-color);
-    color: var(--bg-color);
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
+.log-message .available {
+    color: var(--success-color);
 }
-
-.copy-all-btn:hover:not(:disabled) {
-    background-color: #2b9e3b;
-}
-
-.copy-all-btn:disabled {
-    background-color: #3b5071;
-    cursor: not-allowed;
-}
-
-/* Responsividade */
-@media (max-width: 768px) {
-    body {
-        padding: 15px;
-    }
-    .nick-item {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .status-check {
-        margin-right: 0;
-        margin-top: 5px;
-    }
-    .copy-nick-btn {
-        margin-top: 10px;
-        align-self: flex-end;
-    }
+.log-message .taken {
+    color: var(--error-color);
 }
