@@ -20,26 +20,26 @@
             <div class="input-grid">
                 <div class="input-group">
                     <label for="amount">Nº de Nicks</label>
-                    <input type="number" id="amount" placeholder="Ex: 10" value="5" required>
+                    <input type="number" id="amount" value="5" min="1" required>
                 </div>
                 <div class="input-group">
                     <label for="length">Tamanho (4-16)</label>
-                    <input type="number" id="length" min="4" max="16" placeholder="Ex: 6" value="6" required>
+                    <input type="number" id="length" min="4" max="16" value="6" required>
                 </div>
             </div>
 
             <div class="input-group">
                 <label for="first-letter">Primeira Letra (opcional)</label>
-                <input type="text" id="first-letter" placeholder="Ex: p" maxlength="1">
+                <input type="text" id="first-letter" placeholder="Ex: p" maxlength="1" pattern="[a-zA-Z]*">
             </div>
 
             <div class="input-group">
                 <label for="charset">Tipo de Caracteres</label>
                 <select id="charset">
-                    <option value="letters" selected>Apenas Letras</option>
-                    <option value="letters_digits">Letras e Números</option>
+                    <option value="letters" selected>Apenas Letras (a-z)</option>
+                    <option value="letters_digits">Letras (a-z) e Números</option>
                     <option value="digits">Apenas Números</option>
-                    <option value="all">Letras (Maiúsculas/Minúsculas) e Números</option>
+                    <option value="all">Letras (a-z, A-Z) e Números</option>
                 </select>
             </div>
             
@@ -52,15 +52,17 @@
                 <button type="submit" id="start-btn">▶ Iniciar Geração</button>
                 <button type="button" id="stop-btn" disabled>■ Parar Geração</button>
             </div>
+
+            <div id="status-message" class="status-message" aria-live="polite"></div>
         </form>
 
         <section class="results-section">
             <div class="results-header">
                 <h2>Nicks Válidos Encontrados</h2>
-                <button id="copy-btn" title="Copiar nicks válidos">Copiar</button>
+                <button id="copy-btn" title="Copiar nicks válidos" disabled>Copiar</button>
             </div>
             <ul id="nicks-list">
-            </ul>
+                </ul>
         </section>
 
     </main>
