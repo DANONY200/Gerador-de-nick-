@@ -11,6 +11,13 @@
     --border-radius: 8px;
 }
 
+/* (MELHORIA) Reset global do box-sizing */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Poppins', sans-serif;
     background-color: var(--bg-dark);
@@ -60,6 +67,15 @@ header h1 {
     font-weight: 600;
 }
 
+/* (MELHORIA) Agrupado e usando font-family: inherit */
+input[type="number"],
+input[type="text"],
+select,
+button {
+    font-family: inherit; /* Garante consistência da fonte */
+    font-size: 1em;
+}
+
 input[type="number"],
 input[type="text"],
 select {
@@ -69,9 +85,6 @@ select {
     border: 1px solid #444;
     border-radius: var(--border-radius);
     color: var(--text-primary);
-    font-family: 'Poppins', sans-serif;
-    font-size: 1em;
-    box-sizing: border-box;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -87,6 +100,10 @@ input:focus, select:focus {
     margin-bottom: 20px;
 }
 
+.checkbox-group label {
+    cursor: pointer; /* (MELHORIA) Indica que o label é clicável */
+}
+
 .checkbox-group input {
     margin-right: 10px;
     width: 18px;
@@ -98,18 +115,15 @@ input:focus, select:focus {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    margin-bottom: 25px;
 }
 
 button {
     padding: 12px;
-    font-size: 1em;
     font-weight: 600;
-    font-family: 'Poppins', sans-serif;
     border: none;
     border-radius: var(--border-radius);
     cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
 }
 
 button:active {
@@ -130,7 +144,7 @@ button:active {
     color: var(--text-primary);
 }
 
-#stop-btn:hover, #copy-btn:hover {
+#stop-btn:hover, #copy-btn:hover:not(:disabled) {
     background-color: #444;
 }
 
@@ -138,10 +152,20 @@ button:disabled {
     background-color: #555;
     cursor: not-allowed;
     color: var(--text-secondary);
+    opacity: 0.6; /* (MELHORIA) Feedback visual de desabilitado */
+}
+
+/* (MELHORIA) Estilo para a nova área de status */
+.status-message {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-top: 20px;
+    min-height: 1.2em; /* Evita que o layout "pule" */
 }
 
 .results-section {
-    margin-top: 20px;
+    margin-top: 15px; /* Ajustado por causa do status */
 }
 
 .results-header {
@@ -176,4 +200,20 @@ button:disabled {
 }
 #nicks-list li:nth-child(odd) {
     background-color: rgba(40, 167, 69, 0.05);
+}
+
+/* (MELHORIA) Scrollbar customizada para o tema */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-light);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #777;
 }
