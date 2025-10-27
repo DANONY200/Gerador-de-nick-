@@ -1,71 +1,60 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Nicks para Minecraft</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Gerador de Nicks</title>
+    <style>
+        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; }
+        div { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, select, button { width: 100%; padding: 8px; box-sizing: border-box; border-radius: 4px; border: 1px solid #555; background: #333; color: white; }
+        button { cursor: pointer; }
+        #startButton { background-color: #cc0000; }
+        #stopButton { background-color: #555; }
+        #resultsList { list-style: none; padding: 0; background: #2a2a2a; border-radius: 4px; min-height: 100px; padding: 10px; }
+        #resultsList li { color: #4CAF50; font-family: monospace; }
+        #log { font-size: 0.8em; color: #999; }
+    </style>
 </head>
 <body>
 
-    <main class="container">
-        <header>
-            <h1>Gerador de Nicks</h1>
-        </header>
+    <h1>Gerador de Nicks</h1>
 
-        <form id="generator-form">
-            <div class="input-grid">
-                <div class="input-group">
-                    <label for="amount">Nº de Nicks</label>
-                    <input type="number" id="amount" value="5" min="1" required>
-                </div>
-                <div class="input-group">
-                    <label for="length">Tamanho (4-16)</label>
-                    <input type="number" id="length" min="4" max="16" value="6" required>
-                </div>
-            </div>
+    <div>
+        <label for="length">Comprimento do Nick (4-16):</label>
+        <input type="number" id="length" value="4" min="4" max="16">
+    </div>
+    
+    <div>
+        <label for="amount">Quantidade para encontrar:</label>
+        <input type="number" id="amount" value="5" min="1">
+    </div>
 
-            <div class="input-group">
-                <label for="first-letter">Primeira Letra (opcional)</label>
-                <input type="text" id="first-letter" placeholder="Ex: p" maxlength="1" pattern="[a-zA-Z]*">
-            </div>
+    <div>
+        <label for="firstLetter">Primeira Letra (opcional):</label>
+        <input type="text" id="firstLetter" placeholder="Ex: p" maxlength="1">
+    </div>
 
-            <div class="input-group">
-                <label for="charset">Tipo de Caracteres</label>
-                <select id="charset">
-                    <option value="letters" selected>Apenas Letras (a-z)</option>
-                    <option value="letters_digits">Letras (a-z) e Números</option>
-                    <option value="digits">Apenas Números</option>
-                    <option value="all">Letras (a-z, A-Z) e Números</option>
-                </select>
-            </div>
-            
-            <div class="checkbox-group">
-                <input type="checkbox" id="use-underscore">
-                <label for="use-underscore">Usar Underscore (_)</label>
-            </div>
+    <div>
+        <label for="charset">Tipo de Caracteres:</label>
+        <select id="charset">
+            <option value="letters">Apenas Letras (a-z)</option>
+            <option value="letters_digits">Letras e Dígitos (a-z, 0-9)</option>
+        </select>
+    </div>
 
-            <div class="button-group">
-                <button type="submit" id="start-btn">▶ Iniciar Geração</button>
-                <button type="button" id="stop-btn" disabled>■ Parar Geração</button>
-            </div>
+    <div>
+        <input type="checkbox" id="useUnderscore">
+        <label for="useUnderscore" style="display: inline;">Usar Underscore (_)</label>
+    </div>
 
-            <div id="status-message" class="status-message" aria-live="polite"></div>
-        </form>
+    <button id="startButton">Iniciar Geração</button>
+    <button id="stopButton" disabled>Parar Geração</button>
 
-        <section class="results-section">
-            <div class="results-header">
-                <h2>Nicks Válidos Encontrados</h2>
-                <button id="copy-btn" title="Copiar nicks válidos" disabled>Copiar</button>
-            </div>
-            <ul id="nicks-list">
-                </ul>
-        </section>
-
-    </main>
+    <h3 style="margin-top: 20px;">Nicks Válidos Encontrados:</h3>
+    <ul id="resultsList"></ul>
+    <div id="log"></div>
 
     <script src="script.js"></script>
 </body>
