@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Seleção de Elementos
+    // Seleção de Elementos (igual)
     const form = document.getElementById('generator-form');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
@@ -12,13 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const underscoreCheck = document.getElementById('use-underscore');
     
     const nicksList = document.getElementById('nicks-list');
-    const statusMessage = document.getElementById('status-message'); // (MELHORIA)
+    const statusMessage = document.getElementById('status-message'); 
 
-    // Estado da Aplicação
+    // Estado da Aplicação (igual)
     let isRunning = false;
     let foundNicks = [];
     
-    // Event Listeners
+    // Event Listeners (igual)
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         startGeneration();
@@ -27,12 +27,19 @@ document.addEventListener('DOMContentLoaded', () => {
     stopBtn.addEventListener('click', stopGeneration);
     copyBtn.addEventListener('click', copyNicksToClipboard);
 
-    // --- Funções de Controle ---
+    // --- (NOVA FUNÇÃO) ---
+    /** * Adiciona um atraso (delay) em milissegundos.
+     * Isso é essencial para evitar o Rate Limit (erro 429) das APIs.
+     */
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // --- Funções de Controle (iguais) ---
 
     function startGeneration() {
         if (isRunning) return;
 
-        // Validação de inputs
         const length = parseInt(lengthInput.value);
         if (length < 4 || length > 16) {
             updateStatus("O tamanho do nick deve ser entre 4 e 16.", true);
@@ -53,37 +60,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function stopGeneration() {
         if (!isRunning) return;
         isRunning = false;
-        updateUI(false);
-        updateStatus("Geração parada.");
+        // A mensagem de status será atualizada pelo loop quando ele parar
     }
 
-    /** (MELHORIA) Atualiza a UI e a área de status */
     function updateStatus(message, isError = false) {
         if (!statusMessage) return;
         statusMessage.textContent = message;
         statusMessage.style.color = isError ? 'var(--error-color)' : 'var(--text-secondary)';
     }
 
-    /** Atualiza o estado (habilitado/desabilitado) dos controles */
     function updateUI(running) {
-        isRunning = running; // Garante que o estado seja o mesmo
+        isRunning = running; 
         startBtn.disabled = running;
         stopBtn.disabled = !running;
-        // (MELHORIA) Botão de copiar só é habilitado se não estiver rodando E tiver nicks
         copyBtn.disabled = running || foundNicks.length === 0;
         [amountInput, lengthInput, firstLetterInput, charsetSelect, underscoreCheck]
             .forEach(el => el.disabled = running);
     }
 
-    /** Limpa a lista de nicks e o status */
     function clearResults() {
         nicksList.innerHTML = '';
         foundNicks = [];
-        copyBtn.disabled = true; // (MELHORIA)
-        updateStatus(""); // Limpa a mensagem de status
+        copyBtn.disabled = true; 
+        updateStatus(""); 
     }
     
-    /** Adiciona um nick à lista visual e ao array */
     function addFoundNick(nick) {
         foundNicks.push(nick);
         const li = document.createElement('li');
@@ -91,11 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
         nicksList.appendChild(li);
         nicksList.scrollTop = nicksList.scrollHeight;
         
-        copyBtn.disabled = false; // (MELHORIA) Habilita o botão
-        updateStatus(`Nick encontrado: ${nick}`); // (MELHORIA)
+        copyBtn.disabled = false; 
+        updateStatus(`Nick encontrado: ${nick}`); 
     }
 
-    /** (MELHORIA) Copia para clipboard usando a API e atualiza status */
     async function copyNicksToClipboard() {
         if (foundNicks.length === 0) {
             updateStatus("Nenhum nick para copiar.", true);
@@ -113,9 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Funções de API ---
+    // --- Funções de API (iguais) ---
 
-    /** Checa disponibilidade na API Ashcon (Mojang) */
     async function checkAshcon(nick) {
         try {
             const response = await fetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
@@ -123,55 +122,70 @@ document.addEventListener('DOMContentLoaded', () => {
             return response.status === 404;
         } catch (error) {
             console.error(`Erro ao checar Ashcon para ${nick}:`, error);
+            // (MELHORIA) Se o erro for 429, loga especificamente
+            if (error instanceof Response && error.status === 429) {
+                 console.warn(`[Ashcon] Rate limit atingido!`);
+            }
             return false; // Seguro: Assume que não está disponível em caso de erro
         }
     }
 
-    /** Checa disponibilidade na API Mush */
     async function checkMush(nick) {
         try {
             const response = await fetch(`https://mush.com.br/api/player/${nick}`);
+            // (MELHORIA) Checa se a resposta foi 429 ANTES de tentar ler o JSON
+            if (response.status === 429) {
+                console.warn(`[Mush] Rate limit atingido!`);
+                return false;
+            }
             const data = await response.json();
-            // API retorna success:false e error_code:404 se não existir
             return data.success === false && data.error_code === 404;
         } catch (error) {
             console.error(`Erro ao checar Mush para ${nick}:`, error);
-            return false; // Seguro: Assume que não está disponível
+            return false; 
         }
     }
 
-    // --- Lógica Principal de Geração ---
+    // --- Lógica Principal de Geração (COM MELHORIA) ---
 
-    /** Roda o loop principal de geração e verificação */
     async function runRealApiGeneration() {
         const options = {
             amount: parseInt(amountInput.value),
             length: parseInt(lengthInput.value),
-            firstLetter: firstLetterInput.value.toLowerCase(), // Normaliza
+            firstLetter: firstLetterInput.value.toLowerCase(), 
             charset: charsetSelect.value,
             useUnderscore: underscoreCheck.checked
         };
         let generatedCount = 0;
-        const seenNicks = new Set(); // Evita checar o mesmo nick duas vezes
+        const seenNicks = new Set(); 
 
         while (generatedCount < options.amount && isRunning) {
             let nick;
             do {
                 nick = generateNick(options);
-            } while (seenNicks.has(nick)); // Gera novo se já vimos esse
+            } while (seenNicks.has(nick)); 
             
             seenNicks.add(nick);
+
+            // (MELHORIA DE UX) Informa o usuário qual nick está sendo checado
+            // Isso é bom pois agora haverá um delay
+            updateStatus(`Verificando: ${nick}...`);
             
-            // (MELHORIA DE PERFORMANCE) Roda as duas checagens em paralelo
             const [isAshconAvailable, isMushAvailable] = await Promise.all([
                 checkAshcon(nick),
                 checkMush(nick)
             ]);
 
-            // Só adiciona se estiver disponível em AMBAS as plataformas
             if (isMushAvailable && isAshconAvailable && isRunning) {
                 generatedCount++;
-                addFoundNick(nick);
+                addFoundNick(nick); // Esta função já atualiza o status
+            }
+
+            // --- (MELHORIA CRÍTICA) ---
+            // Adiciona um atraso de 1 segundo (1000ms) para evitar
+            // o bloqueio das APIs (Rate Limit / Erro 429).
+            if (isRunning) {
+                await delay(1000);
             }
         }
         
@@ -180,25 +194,22 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUI(false);
     }
     
-    /** Gera um nick aleatório baseado nas opções */
+    // Função de Geração de Nick (igual)
     function generateNick({ length, firstLetter, charset, useUnderscore }) {
         let chars = '';
         const lower = 'abcdefghijklmnopqrstuvwxyz';
         const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         const digits = '0123456789';
 
-        // Define o conjunto de caracteres base
         if (charset === 'letters') chars = lower;
         else if (charset === 'digits') chars = digits;
         else if (charset === 'letters_digits') chars = lower + digits;
         else if (charset === 'all') chars = lower + upper + digits;
 
-        // (CORREÇÃO DE BUG) Adiciona underscore ao conjunto, em vez de substituir
         if (useUnderscore) {
             chars += '_';
         }
 
-        // Se o charset ainda estiver vazio (ex: só underscore), usa letras
         if (chars === '' || chars === '_') {
             chars = lower + (useUnderscore ? '_' : '');
         }
@@ -210,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
             result += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         
-        // Adiciona a primeira letra (já normalizada para minúscula)
         if (firstLetter) {
             result = firstLetter + result;
         }
