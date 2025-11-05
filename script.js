@@ -1,27 +1,18 @@
-//==================================================================
-//  UTILS
-//==================================================================
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 const sleep = (t = 250) => new Promise(r => setTimeout(r, t));
 
-// Cache rápido para sessão sem precisar re-checar
 const cache = {
     hit: nick => sessionStorage.getItem(`chk-${nick}`),
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
-//==================================================================
-//  ENGINES DE CHECAGEM  (Ashcon + Fallback públicos)
-//==================================================================
-// (API 1) ASHCON (principal)
 async function ashcon(nick) {
     const url = `https://api.ashcon.app/mojang/v2/user/${nick}`;
     const res = await fetch(url);
-    return res.status === 404;      // true = disponível
+    return res.status === 404;
 }
 
-// (API 2) mcuser.net (sem CORS)
 async function mcapi(nick) {
     const url = `https://mcuser.net/api/server/user/${nick}`;
     const res = await fetch(url);
@@ -29,14 +20,12 @@ async function mcapi(nick) {
     catch { return false; }
 }
 
-// (API 3) api.mojang.com por UUID (pesa menos)
 async function mojang(nick) {
     const url = `https://api.mojang.com/users/profiles/minecraft/${nick}`;
     const res = await fetch(url, { mode: 'cors' });
     return res.status === 204 || !res.ok;
 }
 
-// Junta todas numa Promise race
 async function checkNickAvailability(nick) {
     if (cache.hit(nick)) return cache.get(nick) === 'true';
     try {
@@ -47,15 +36,12 @@ async function checkNickAvailability(nick) {
         ]);
         cache.set(nick, free);
         return free;
-    } catch {        // todas rejeitaram → assume ocupado
+    } catch {
         cache.set(nick, false);
         return false;
     }
 }
 
-//==================================================================
-//  GERADOR
-//==================================================================
 const genChars = {
     letters: 'abcdefghijklmnopqrstuvwxyz',
     letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
@@ -69,7 +55,6 @@ function generateNick(len, first, type, allowUnderscore) {
     for (let i = nick.length; i < len; i++) {
         nick += pool[Math.floor(Math.random() * pool.length)];
     }
-    // evita underscore duplicado / no inicio
     if (allowUnderscore && len > 1 && type !== 'full') {
         let idx = 1 + Math.floor(Math.random() * (len - 1));
         nick = nick.slice(0, idx) + '_' + nick.slice(idx + 1);
@@ -77,9 +62,6 @@ function generateNick(len, first, type, allowUnderscore) {
     return nick;
 }
 
-//==================================================================
-//  MOTOR DE BUSCA
-//==================================================================
 let isRunning = false;
 let abort = false;
 
@@ -93,8 +75,50 @@ const ui = {
     start: $('#startButton'),
     stop: $('#stopButton'),
     list: $('#resultsList'),
-    stats: $('#stats')
+    stats: $('#stats'),
+    copyAll: $('#copyAllBtn'),
+    download: $('#downloadBtn')
 };
+
+function updateActionButtons() {
+    const has = ui.list.children.length > 0;
+    ui.copyAll.disabled = !has;
+    ui.download.disabled = !has;
+}
+
+ui.copyAll.addEventListener('click', () => {
+    const text = [...ui.list.children].map(li => li.dataset.nick).join('\n');
+    navigator.clipboard.writeText(text).then(() => alert('Copiado!'));
+});
+
+ui.download.addEventListener('click', () => {
+    const text = [...ui.list.children].map(li => li.dataset.nick).join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nicks.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+function addNick(nick) {
+    const li = document.createElement('li');
+    li.textContent = nick;
+    li.dataset.nick = nick;
+
+    const cpy = document.createElement('button');
+    cpy.textContent = '📋';
+    cpy.style.fontSize = '0.7em';
+    cpy.style.background = 'transparent';
+    cpy.style.border = 'none';
+    cpy.style.color = '#4CAF50';
+    cpy.onclick = () => navigator.clipboard.writeText(nick);
+    li.append(' ', cpy);
+
+    ui.list.appendChild(li);
+    updateActionButtons();
+}
 
 async function startGeneration() {
     if (isRunning) return;
@@ -127,9 +151,7 @@ async function startGeneration() {
 
         if (await checkNickAvailability(nick)) {
             found++;
-            const li = document.createElement('li');
-            li.textContent = nick;
-            ui.list.appendChild(li);
+            addNick(nick);
         }
         await sleep(interval);
     }
