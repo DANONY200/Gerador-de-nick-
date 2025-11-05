@@ -2,60 +2,67 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Nicks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gerador de Nicks v2</title>
     <style>
-        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; }
-        div { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input, select, button { width: 100%; padding: 8px; box-sizing: border-box; border-radius: 4px; border: 1px solid #555; background: #333; color: white; }
-        button { cursor: pointer; }
-        #startButton { background-color: #cc0000; }
-        #stopButton { background-color: #555; }
-        #resultsList { list-style: none; padding: 0; background: #2a2a2a; border-radius: 4px; min-height: 100px; padding: 10px; }
-        #resultsList li { color: #4CAF50; font-family: monospace; }
-        #log { font-size: 0.8em; color: #999; }
+        :root { --bg:#111; --surface:#1e1e1e; --accent:#cc0000; --text:#fff; --sub:#aaa; --ok:#4caf50; }
+        *{box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+        body{margin:0;padding:20px;background:var(--bg);color:var(--text)}
+        h1{margin-top:0}
+        section{background:var(--surface);padding:20px;border-radius:6px;margin-bottom:20px}
+        label{display:block;margin:8px 0 4px;font-size:.9em;color:var(--sub)}
+        input,select,button{width:100%;padding:8px;border-radius:4px;border:1px solid #555;background:#333;color:var(--text)}
+        button{cursor:pointer;font-weight:600}
+        #startButton{background:var(--accent)}
+        #stopButton{background:#555}
+        ul{list-style:none;padding:0;margin:0;background:#252525;border-radius:4px;max-height:300px;overflow:auto}
+        li{padding:6px 8px;font-family:monospace;color:var(--ok)}
+        #stats{margin-top:6px;font-size:.8em;color:var(--sub)}
     </style>
 </head>
 <body>
 
-    <h1>Gerador de Nicks</h1>
+    <section>
+        <h1>Gerador de Nicks</h1>
 
-    <div>
-        <label for="length">Comprimento do Nick (4-16):</label>
-        <input type="number" id="length" value="4" min="4" max="16">
-    </div>
-    
-    <div>
-        <label for="amount">Quantidade para encontrar:</label>
-        <input type="number" id="amount" value="5" min="1">
-    </div>
+        <label>Comprimento (4-16):
+            <input type="number" id="length" value="6" min="4" max="16">
+        </label>
 
-    <div>
-        <label for="firstLetter">Primeira Letra (opcional):</label>
-        <input type="text" id="firstLetter" placeholder="Ex: p" maxlength="1">
-    </div>
+        <label>Quantidade a encontrar:
+            <input type="number" id="amount" value="10" min="1">
+        </label>
 
-    <div>
-        <label for="charset">Tipo de Caracteres:</label>
-        <select id="charset">
-            <option value="letters">Apenas Letras (a-z)</option>
-            <option value="letters_digits">Letras e Dígitos (a-z, 0-9)</option>
-        </select>
-    </div>
+        <label>Primeira letra (opcional):
+            <input type="text" id="firstLetter" maxlength="1" placeholder="Ex.: p">
+        </label>
 
-    <div>
-        <input type="checkbox" id="useUnderscore">
-        <label for="useUnderscore" style="display: inline;">Usar Underscore (_)</label>
-    </div>
+        <label>Tipo de caracteres:
+            <select id="charset">
+                <option value="letters">Apenas letras (a-z)</option>
+                <option value="letters_digits">Letras + dígitos (a-z,0-9)</option>
+                <option value="full">Letras + dígitos + underscore</option>
+            </select>
+        </label>
 
-    <button id="startButton">Iniciar Geração</button>
-    <button id="stopButton" disabled>Parar Geração</button>
+        <label>
+            <input type="checkbox" id="useUnderscore"> Usar underscore (_)
+        </label>
 
-    <h3 style="margin-top: 20px;">Nicks Válidos Encontrados:</h3>
-    <ul id="resultsList"></ul>
-    <div id="log"></div>
+        <label>
+            <input type="checkbox" id="turbo"> Modo turbo (intervalo mínimo)
+        </label>
 
-    <script src="script.js"></script>
+        <button id="startButton">Iniciar geração</button>
+        <button id="stopButton" disabled>Parar geração</button>
+    </section>
+
+    <section>
+        <h2>Nicks disponíveis</h2>
+        <ul id="resultsList"></ul>
+        <div id="stats"></div>
+    </section>
+
+<script src="script.js"></script>
 </body>
 </html>
