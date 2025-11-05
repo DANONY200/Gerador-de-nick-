@@ -1,144 +1,149 @@
-// Seletores do DOM
-const lengthInput = document.getElementById('length');
-const amountInput = document.getElementById('amount');
-const firstLetterInput = document.getElementById('firstLetter');
-const charsetInput = document.getElementById('charset');
-const underscoreInput = document.getElementById('useUnderscore');
-const startButton = document.getElementById('startButton');
-const stopButton = document.getElementById('stopButton');
-const resultsList = document.getElementById('resultsList');
-const logElement = document.getElementById('log');
+//==================================================================
+//  UTILS
+//==================================================================
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const sleep = (t = 250) => new Promise(r => setTimeout(r, t));
 
-// Variável de controle
-let isRunning = false;
-let foundNicks = [];
+// Cache rápido para sessão sem precisar re-checar
+const cache = {
+    hit: nick => sessionStorage.getItem(`chk-${nick}`),
+    set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
+};
 
-// Helper: Pausa a execução (para não sobrecarregar a API)
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper: Escreve no log da tela
-function log(message) {
-    console.log(message);
-    logElement.textContent = message;
-}
-
-// 1. Geração do Nick (Tradução do seu Python)
-function generateNick(length, firstLetter, charset, useUnderscore) {
-    let chars = '';
-    const letters = 'abcdefghijklmnopqrstuvwxyz';
-    const digits = '0123456789';
-
-    if (charset === 'letters') {
-        chars = letters;
-    } else if (charset === 'letters_digits') {
-        chars = letters + digits;
-    }
-
-    let base = '';
-    if (firstLetter) {
-        base = firstLetter.toLowerCase() + Array.from({ length: length - 1 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
-    } else {
-        base = Array.from({ length: length }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
-    }
-
-    if (useUnderscore && length > 1) {
-        const index = Math.floor(Math.random() * (length - 1)) + 1; // Não coloca no início
-        base = base.substring(0, index) + '_' + base.substring(index + 1);
-    }
-
-    return base;
-}
-
-// 2. Verificação do Nick (APENAS Ashcon)
-async function checkNickAvailability(nick) {
-    // NOTA: Não podemos checar mush.com.br por causa de CORS.
-    // Vamos checar apenas a API Ashcon, que permite requisições do navegador.
-    
+//==================================================================
+//  ENGINES DE CHECAGEM  (Ashcon + Fallback públicos)
+//==================================================================
+// (API 1) ASHCON (principal)
+async function ashcon(nick) {
     const url = `https://api.ashcon.app/mojang/v2/user/${nick}`;
-    
+    const res = await fetch(url);
+    return res.status === 404;      // true = disponível
+}
+
+// (API 2) mcuser.net (sem CORS)
+async function mcapi(nick) {
+    const url = `https://mcuser.net/api/server/user/${nick}`;
+    const res = await fetch(url);
+    try { const json = await res.json(); return json.exists === false; }
+    catch { return false; }
+}
+
+// (API 3) api.mojang.com por UUID (pesa menos)
+async function mojang(nick) {
+    const url = `https://api.mojang.com/users/profiles/minecraft/${nick}`;
+    const res = await fetch(url, { mode: 'cors' });
+    return res.status === 204 || !res.ok;
+}
+
+// Junta todas numa Promise race
+async function checkNickAvailability(nick) {
+    if (cache.hit(nick)) return cache.get(nick) === 'true';
     try {
-        const response = await fetch(url, { method: 'GET' });
-        
-        // Status 404 significa "Not Found", ou seja, o nick NÃO existe e está DISPONÍVEL.
-        if (response.status === 404) {
-            return true; // Disponível
-        }
-        
-        // Qualquer outro status (como 200) significa que o nick foi encontrado e está OCUPADO.
-        return false; // Ocupado
-        
-    } catch (error) {
-        log(`Erro de rede ao checar ${nick}: ${error.message}`);
-        return false; // Assumir como ocupado se houver erro
+        const free = await Promise.any([
+            ashcon(nick),
+            mcapi(nick),
+            mojang(nick)
+        ]);
+        cache.set(nick, free);
+        return free;
+    } catch {        // todas rejeitaram → assume ocupado
+        cache.set(nick, false);
+        return false;
     }
 }
 
-// 3. Função principal de Geração
+//==================================================================
+//  GERADOR
+//==================================================================
+const genChars = {
+    letters: 'abcdefghijklmnopqrstuvwxyz',
+    letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
+    full: 'abcdefghijklmnopqrstuvwxyz0123456789_'
+};
+
+function generateNick(len, first, type, allowUnderscore) {
+    const pool = genChars[type] || genChars.letters;
+    let nick = '';
+    if (first) nick += first.toLowerCase();
+    for (let i = nick.length; i < len; i++) {
+        nick += pool[Math.floor(Math.random() * pool.length)];
+    }
+    // evita underscore duplicado / no inicio
+    if (allowUnderscore && len > 1 && type !== 'full') {
+        let idx = 1 + Math.floor(Math.random() * (len - 1));
+        nick = nick.slice(0, idx) + '_' + nick.slice(idx + 1);
+    }
+    return nick;
+}
+
+//==================================================================
+//  MOTOR DE BUSCA
+//==================================================================
+let isRunning = false;
+let abort = false;
+
+const ui = {
+    length: $('#length'),
+    amount: $('#amount'),
+    first: $('#firstLetter'),
+    charset: $('#charset'),
+    underscore: $('#useUnderscore'),
+    turbo: $('#turbo'),
+    start: $('#startButton'),
+    stop: $('#stopButton'),
+    list: $('#resultsList'),
+    stats: $('#stats')
+};
+
 async function startGeneration() {
     if (isRunning) return;
+    isRunning = true; abort = false;
+    ui.start.disabled = true;
+    ui.stop.disabled = false;
+    ui.list.innerHTML = '';
 
-    isRunning = true;
-    foundNicks = [];
-    resultsList.innerHTML = '';
-    startButton.disabled = true;
-    stopButton.disabled = false;
-    log('Iniciando geração...');
+    const len = +ui.length.value;
+    const target = +ui.amount.value;
+    const first = ui.first.value.trim();
+    const charset = ui.charset.value;
+    const allowUnder = ui.underscore.checked;
+    const turbo = ui.turbo.checked;
+    const interval = turbo ? 50 : 300;
 
-    const length = parseInt(lengthInput.value, 10);
-    const amount = parseInt(amountInput.value, 10);
-    const firstLetter = firstLetterInput.value;
-    const charset = charsetInput.value;
-    const useUnderscore = underscoreInput.checked;
-
-    let foundCount = 0;
+    const seen = new Set();
+    let found = 0;
     let attempts = 0;
-    const seen = new Set(); // Para não checar o mesmo nick duas vezes
 
-    while (foundCount < amount && isRunning) {
+    const timer = setInterval(() => {
+        ui.stats.textContent = `Tentativas: ${attempts} | Encontrados: ${found}/${target}`;
+    }, 200);
+
+    while (found < target && !abort) {
         attempts++;
-        let nick = generateNick(length, firstLetter, charset, useUnderscore);
-
-        if (seen.has(nick)) {
-            continue; // Já tentamos esse
-        }
+        let nick = generateNick(len, first, charset, allowUnder);
+        if (seen.has(nick)) continue;
         seen.add(nick);
-        
-        log(`Tentando nick: ${nick} (Tentativa ${attempts})`);
 
-        const isAvailable = await checkNickAvailability(nick);
-
-        if (isAvailable) {
-            foundCount++;
-            foundNicks.push(nick);
-            
-            // Adiciona na lista da tela
+        if (await checkNickAvailability(nick)) {
+            found++;
             const li = document.createElement('li');
             li.textContent = nick;
-            resultsList.appendChild(li);
-            
-            log(`Nick VÁLIDO encontrado: ${nick} (${foundCount}/${amount})`);
+            ui.list.appendChild(li);
         }
-        
-        // Pausa de 300ms para não dar rate limit na API
-        await sleep(300);
+        await sleep(interval);
     }
 
-    if (isRunning) {
-        log(`Geração concluída! ${foundCount} nicks encontrados.`);
-    } else {
-        log('Geração interrompida pelo usuário.');
-    }
-    
-    stopGeneration(); // Limpa o estado
+    clearInterval(timer);
+    ui.stats.textContent = `Finalizado: ${found}/${target} após ${attempts} tentativas.`;
+    stopGeneration();
 }
 
-// 4. Função de Parada
 function stopGeneration() {
-    isRunning = false;
-    startButton.disabled = false;
-    stopButton.disabled = true;
+    isRunning = false; abort = true;
+    ui.start.disabled = false;
+    ui.stop.disabled = true;
 }
 
-// 5. Event Listeners
-startButton.addEventListener('click', startGeneration);
-stopButton.addEventListener('click', stopGeneration);
+ui.start.addEventListener('click', startGeneration);
+ui.stop.addEventListener('click', stopGeneration);
