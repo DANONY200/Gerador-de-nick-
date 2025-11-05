@@ -24,19 +24,15 @@
 
     <section>
         <h1>Gerador de Nicks</h1>
-
         <label>Comprimento (4-16):
             <input type="number" id="length" value="6" min="4" max="16">
         </label>
-
         <label>Quantidade a encontrar:
             <input type="number" id="amount" value="10" min="1">
         </label>
-
         <label>Primeira letra (opcional):
             <input type="text" id="firstLetter" maxlength="1" placeholder="Ex.: p">
         </label>
-
         <label>Tipo de caracteres:
             <select id="charset">
                 <option value="letters">Apenas letras (a-z)</option>
@@ -44,15 +40,12 @@
                 <option value="full">Letras + dígitos + underscore</option>
             </select>
         </label>
-
         <label>
             <input type="checkbox" id="useUnderscore"> Usar underscore (_)
         </label>
-
         <label>
             <input type="checkbox" id="turbo"> Modo turbo (intervalo mínimo)
         </label>
-
         <button id="startButton">Iniciar geração</button>
         <button id="stopButton" disabled>Parar geração</button>
     </section>
@@ -61,6 +54,8 @@
         <h2>Nicks disponíveis</h2>
         <ul id="resultsList"></ul>
         <div id="stats"></div>
+        <button id="copyAllBtn" disabled>Copiar tudo</button>
+        <button id="downloadBtn" disabled>Baixar .txt</button>
     </section>
 
 <script src="script.js"></script>
