@@ -7,28 +7,47 @@ const cache = {
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
+// --- FUNÇÕES DE API CORRIGIDAS ---
+
 async function ashcon(nick) {
     const url = `https://api.ashcon.app/mojang/v2/user/${nick}`;
     const res = await fetch(url);
-    return res.status === 404;
+    if (res.status === 404) return true; // Disponível
+    if (res.status === 200) return false; // Ocupado
+    throw new Error(`Ashcon API returned status ${res.status}`); // Erro/Ambíguo
 }
 
 async function mcapi(nick) {
     const url = `https://mcuser.net/api/server/user/${nick}`;
     const res = await fetch(url);
-    try { const json = await res.json(); return json.exists === false; }
-    catch { return false; }
+    if (!res.ok) {
+        throw new Error(`MCAPI returned status ${res.status}`);
+    }
+    try {
+        const json = await res.json();
+        if (json.exists === false) return true; // Disponível
+        if (json.exists === true) return false; // Ocupado
+        throw new Error('MCAPI returned unexpected JSON');
+    } catch (e) {
+        throw new Error(`MCAPI parsing failed: ${e.message}`);
+    }
 }
 
 async function mojang(nick) {
     const url = `https://api.mojang.com/users/profiles/minecraft/${nick}`;
     const res = await fetch(url, { mode: 'cors' });
-    return res.status === 204 || !res.ok;
+    if (res.status === 204) return true; // Disponível
+    if (res.status === 200) return false; // Ocupado
+    throw new Error(`Mojang API returned status ${res.status}`); // Erro/Ambíguo
 }
+
+// --- FIM DAS CORREÇÕES ---
 
 async function checkNickAvailability(nick) {
     if (cache.hit(nick)) return cache.get(nick) === 'true';
     try {
+        // Promise.any agora funcionará corretamente,
+        // pulando APIs que "throw new Error"
         const free = await Promise.any([
             ashcon(nick),
             mcapi(nick),
@@ -37,6 +56,7 @@ async function checkNickAvailability(nick) {
         cache.set(nick, free);
         return free;
     } catch {
+        // Isso agora significa que TODAS as APIs falharam ou retornaram 'false'
         cache.set(nick, false);
         return false;
     }
