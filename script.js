@@ -1,7 +1,6 @@
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-// Tempo de espera mínimo para não travar a CPU
-const sleep = (t = 50) => new Promise(r => setTimeout(r, t));
+const sleep = (t = 10) => new Promise(r => setTimeout(r, t));
 
 const cache = {
     get: nick => {
@@ -11,74 +10,70 @@ const cache = {
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
-// --- REQUISIÇÃO RIGOROSA ---
 async function strictFetch(url) {
     const controller = new AbortController();
-    // Timeout curto (2.5s). Se demorar, descarta.
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     try {
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         return res;
     } catch (error) {
-        // Se der qualquer erro de rede ou timeout, retorna null
         clearTimeout(timeoutId);
         return null;
     }
 }
 
-// Verifica na API Ashcon
 async function ashcon(nick) {
     const res = await strictFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
-    
-    // REGRA DE OURO: Se deu erro de rede, timeout, ou rate limit -> DESCARTA (null)
-    if (!res) return null; 
-    
-    // Só retorna TRUE se for explicitamente 404 (Não Encontrado)
+    if (!res) return null;
     if (res.status === 404) return true;
-    
-    // Qualquer outra coisa (200, 429, 500) conta como Ocupado/Erro
-    return false;
+    if (res.status === 200) return false;
+    return null;
 }
 
-// Verifica na LabyMod (Backup)
+async function mush(nick) {
+    const res = await strictFetch(`https://mush.com.br/api/player/${nick}`);
+    if (!res) return null;
+    if (res.status === 404) return true;
+    if (res.status === 200) return false;
+    return null;
+}
+
 async function labymod(nick) {
     const res = await strictFetch(`https://laby.net/api/v3/user/${nick}`);
     if (!res) return null;
-
     if (res.status === 404) return true;
-    return false;
+    if (res.status === 200) return false;
+    return null;
 }
 
 async function checkNickAvailability(nick) {
-    // 1. Cache
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    // 2. Tenta Ashcon
-    let result = await ashcon(nick);
-
-    // 3. Se Ashcon deu erro/ocupado/timeout, tenta a LabyMod como última chance?
-    // VOCÊ PEDIU: "Se der erro, descarta".
-    // Então, se o Ashcon falhar (retornar null ou false), a gente assume que já era.
-    // MAS, para garantir que não estamos perdendo nicks bons por falha momentânea da Ashcon,
-    // vamos testar no LabyMod APENAS se o Ashcon der "Erro de Rede" (null).
-    
-    if (result === null) {
-        result = await labymod(nick);
+    const r1 = await ashcon(nick);
+    if (r1 !== true) {
+        cache.set(nick, false);
+        return false; 
     }
 
-    // Se depois disso o resultado não for EXPLICITAMENTE true (Disponível), descarta.
-    if (result !== true) {
-        result = false;
+    const r2 = await mush(nick);
+    if (r2 !== true) {
+        cache.set(nick, false);
+        return false; 
     }
 
-    cache.set(nick, result);
-    return result;
+    const r3 = await labymod(nick);
+    if (r3 !== true) {
+        cache.set(nick, false);
+        return false; 
+    }
+
+    cache.set(nick, true);
+    return true;
 }
 
-// --- GERADOR DE NICKS (MANTIDO IGUAL) ---
 const genChars = {
     letters: 'abcdefghijklmnopqrstuvwxyz',
     letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
@@ -116,7 +111,6 @@ function generateNick(len, first, type, allowUnderscore) {
     return nick;
 }
 
-// --- INTERFACE (UI) ---
 let isRunning = false;
 let abort = false;
 
@@ -156,7 +150,7 @@ ui.download.addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'nicks_disponiveis.txt';
+    a.download = 'nicks_validos_auditados.txt';
     a.click();
     URL.revokeObjectURL(url);
 });
@@ -167,8 +161,8 @@ function addNick(nick) {
     li.style.animation = "fadeIn 0.3s";
     
     const span = document.createElement('span');
-    span.textContent = nick;
-    span.style.color = "#4ade80";
+    span.innerHTML = `${nick} <small style="font-size:0.7em; color:#fff; opacity:0.5;">(Auditado 3x)</small>`;
+    span.style.color = "#4ade80"; 
 
     const btn = document.createElement('button');
     btn.className = 'copy-btn';
@@ -191,7 +185,7 @@ async function startGeneration() {
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = '🕵️ MODO RIGOROSO ATIVADO...';
+    ui.stats.textContent = '🛡️ INICIANDO AUDITORIA TRIPLA...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -200,8 +194,7 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    // Mantivemos a velocidade alta, pois agora o descarte é rápido
-    const concurrency = isTurbo ? 60 : 5; 
+    const concurrency = isTurbo ? 50 : 5; 
 
     const seen = new Set();
     let found = 0;
@@ -211,7 +204,7 @@ async function startGeneration() {
     const speedInterval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(attempts / elapsed);
-        ui.stats.textContent = `⚡ Verificados: ${attempts} | PPS: ${speed}/s | ✅ Válidos: ${found}/${target}`;
+        ui.stats.textContent = `🔎 Analisados: ${attempts} | PPS: ${speed}/s | ⭐ Aprovados: ${found}/${target}`;
     }, 500);
 
     while (found < target && !abort) {
@@ -223,7 +216,7 @@ async function startGeneration() {
                 seen.add(nick);
                 batch.push(nick);
             }
-            if(seen.size > 100000) seen.clear();
+            if(seen.size > 150000) seen.clear();
         }
         
         const results = await Promise.all(batch.map(async (n) => {
@@ -235,14 +228,13 @@ async function startGeneration() {
         attempts += batch.length;
 
         for (const res of results) {
-            // Só adiciona se for EXATAMENTE true (sem incertezas)
             if (res && res.free === true && found < target) {
                 found++;
                 addNick(res.nick);
             }
         }
         
-        await sleep(isTurbo ? 5 : 100);
+        await sleep(isTurbo ? 10 : 100);
     }
 
     clearInterval(speedInterval);
@@ -255,7 +247,7 @@ function stopGeneration(completed = false) {
     ui.stop.disabled = true;
     
     if (completed) {
-        ui.stats.textContent = `✅ Finalizado! Lista gerada com rigor.`;
+        ui.stats.textContent = `✅ Auditoria Finalizada!`;
     } else {
         ui.stats.textContent += ' (Parado)';
     }
