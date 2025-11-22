@@ -2,6 +2,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 const sleep = (t = 250) => new Promise(r => setTimeout(r, t));
 
+// Sistema de Cache para economizar requisições
 const cache = {
     get: nick => {
         const val = sessionStorage.getItem(`chk-${nick}`);
@@ -10,40 +11,91 @@ const cache = {
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
+// --- NOVA FUNÇÃO INTELIGENTE DE REQUISIÇÃO (O SEGREDO) ---
+async function smartFetch(url) {
+    let tentativas = 0;
+    const maxTentativas = 4; // Tenta até 4 vezes se der erro
+
+    while (tentativas < maxTentativas) {
+        try {
+            const res = await fetch(url);
+
+            // Se for 429 (Rate Limit), o servidor pediu para esperar
+            if (res.status === 429) {
+                // Aumenta o tempo de espera a cada erro (Backoff Exponencial)
+                const tempoEspera = 2000 + (tentativas * 1500);
+                // Atualiza a interface discretamente se tiver UI
+                console.warn(`⏳ Rate Limit detectado. Esperando ${tempoEspera}ms...`);
+                await sleep(tempoEspera);
+                tentativas++;
+                continue;
+            }
+
+            // Se for erro de servidor (5xx), tenta de novo
+            if (res.status >= 500) {
+                await sleep(1000);
+                tentativas++;
+                continue;
+            }
+
+            return res; // Retorna a resposta se for 200 ou 404
+
+        } catch (e) {
+            // Erro de internet/rede
+            await sleep(1000);
+            tentativas++;
+        }
+    }
+    return null; // Falhou todas as tentativas
+}
+
+// Verifica na API Ashcon (Mojang Wrapper)
 async function ashcon(nick) {
-    const res = await fetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
-    if (res.status === 404) return true; 
-    if (res.status === 200) return false; 
-    throw new Error(`Ashcon ${res.status}`);
+    const res = await smartFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
+    if (!res) return false; // Se falhou a conexão, assume indisponível por segurança
+    
+    if (res.status === 404) return true;  // Disponível
+    if (res.status === 200) return false; // Ocupado
+    return false; // Outros erros
 }
 
+// Verifica na LabyMod (Backup)
 async function labymod(nick) {
-    const res = await fetch(`https://laby.net/api/v3/user/${nick}`);
-    if (res.status === 404) return true; 
-    if (res.status === 200) return false; 
-    throw new Error('LabyMod Error');
+    const res = await smartFetch(`https://laby.net/api/v3/user/${nick}`);
+    if (!res) return false;
+
+    if (res.status === 404) return true;
+    if (res.status === 200) return false;
+    return false;
 }
 
+// Função Principal de Verificação
 async function checkNickAvailability(nick) {
+    // 1. Verifica cache primeiro
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
     try {
-        const step1 = await ashcon(nick).catch(() => null);
+        // 2. Passo 1: Ashcon
+        const step1 = await ashcon(nick);
         
+        // Se Ashcon disse que tá ocupado, nem perde tempo com LabyMod
         if (step1 === false) {
             cache.set(nick, false);
             return false;
         }
 
-        const step2 = await labymod(nick).catch(() => null);
+        // 3. Passo 2: LabyMod (Confirmação Dupla para evitar falso positivo)
+        // Só verifica no Laby se o Ashcon disse que estava livre
+        const step2 = await labymod(nick);
         
         if (step2 === false) {
-            cache.set(nick, false);
+            cache.set(nick, false); // Era falso positivo do Ashcon
             return false;
         }
 
-        if (step1 === true || step2 === true) {
+        // Se ambos disseram que é livre (ou true)
+        if (step1 === true && step2 === true) {
             cache.set(nick, true);
             return true;
         }
@@ -51,10 +103,12 @@ async function checkNickAvailability(nick) {
         return false;
 
     } catch (e) {
-        return false;
+        console.error(e);
+        return false; // Na dúvida, diz que não tá disponível
     }
 }
 
+// --- GERADOR DE NICKS (MANTIDO E OTIMIZADO) ---
 const genChars = {
     letters: 'abcdefghijklmnopqrstuvwxyz',
     letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
@@ -94,6 +148,7 @@ function generateNick(len, first, type, allowUnderscore) {
     return nick;
 }
 
+// --- CONTROLE DE INTERFACE (UI) ---
 let isRunning = false;
 let abort = false;
 
@@ -133,7 +188,7 @@ ui.download.addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'nicks.txt';
+    a.download = 'nicks_disponiveis.txt';
     a.click();
     URL.revokeObjectURL(url);
 });
@@ -142,21 +197,24 @@ function addNick(nick) {
     const li = document.createElement('li');
     li.dataset.nick = nick;
     
+    // Animação de entrada
+    li.style.animation = "fadeIn 0.5s";
+    
     const span = document.createElement('span');
     span.textContent = nick;
+    span.style.fontWeight = "bold";
+    span.style.color = "#4ade80"; // Verde neon
 
     const btn = document.createElement('button');
     btn.className = 'copy-btn';
     btn.textContent = 'Copiar';
     btn.onclick = () => {
         navigator.clipboard.writeText(nick);
-        btn.textContent = 'OK';
-        btn.style.color = 'var(--ok)';
-        btn.style.borderColor = 'var(--ok)';
+        btn.textContent = 'Copiado!';
+        btn.style.background = '#22c55e';
         setTimeout(() => {
             btn.textContent = 'Copiar';
-            btn.style.color = '';
-            btn.style.borderColor = '';
+            btn.style.background = '';
         }, 1500);
     };
 
@@ -173,7 +231,7 @@ async function startGeneration() {
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = 'Iniciando alta velocidade...';
+    ui.stats.textContent = '🚀 Iniciando motores...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -182,7 +240,8 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    const concurrency = isTurbo ? 25 : 2; 
+    // Ajuste de segurança para não travar o navegador
+    const concurrency = isTurbo ? 15 : 3; 
 
     const seen = new Set();
     let found = 0;
@@ -193,21 +252,23 @@ async function startGeneration() {
     const speedInterval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000;
         speed = Math.round(attempts / elapsed);
-        ui.stats.textContent = `Checados: ${attempts} | PPS: ${speed}/s | Encontrados: ${found}/${target}`;
+        ui.stats.textContent = `⚡ Verificados: ${attempts} | Vel: ${speed}/s | ✅ Achados: ${found}/${target}`;
     }, 1000);
 
     while (found < target && !abort) {
         const batch = [];
         
+        // Gera um lote de nicks
         while (batch.length < concurrency) {
             let nick = generateNick(len, first, charset, allowUnder);
             if (!seen.has(nick)) {
                 seen.add(nick);
                 batch.push(nick);
             }
-            if(seen.size > 20000) seen.clear();
+            if(seen.size > 50000) seen.clear(); // Limpa memória
         }
         
+        // Processa o lote em paralelo (Promise.all)
         const promises = batch.map(async (n) => {
             if (abort) return null;
             const free = await checkNickAvailability(n);
@@ -224,7 +285,10 @@ async function startGeneration() {
             }
         }
         
-        if (!isTurbo) await sleep(150);
+        // Pausa estratégica se não for Turbo (para evitar BAN de IP)
+        if (!isTurbo) await sleep(200); 
+        // Pausa mínima no Turbo para dar respiro à CPU
+        else await sleep(50);
     }
 
     clearInterval(speedInterval);
@@ -237,9 +301,9 @@ function stopGeneration(completed = false) {
     ui.stop.disabled = true;
     
     if (completed) {
-        ui.stats.textContent = `Concluído! ${ui.list.children.length} nicks encontrados.`;
+        ui.stats.textContent = `🏆 Sucesso! ${ui.list.children.length} nicks encontrados.`;
     } else {
-        ui.stats.textContent += ' (Parado)';
+        ui.stats.textContent += ' (Parado pelo usuário)';
     }
 }
 
