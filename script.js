@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
+// Tempo de espera mínimo para não travar a CPU
 const sleep = (t = 50) => new Promise(r => setTimeout(r, t));
 
-// Cache simples
 const cache = {
     get: nick => {
         const val = sessionStorage.getItem(`chk-${nick}`);
@@ -11,69 +11,74 @@ const cache = {
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
-// --- FUNÇÃO DE REQUISIÇÃO RÁPIDA ---
-async function fastFetch(url) {
+// --- REQUISIÇÃO RIGOROSA ---
+async function strictFetch(url) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500); // Timeout de 3.5s (rápido)
+    // Timeout curto (2.5s). Se demorar, descarta.
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
 
     try {
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         return res;
     } catch (error) {
+        // Se der qualquer erro de rede ou timeout, retorna null
         clearTimeout(timeoutId);
-        return null; // Retorna null se der erro ou timeout
+        return null;
     }
 }
 
-// Verifica na API Ashcon (Principal)
+// Verifica na API Ashcon
 async function ashcon(nick) {
-    const res = await fastFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
-    if (!res) return null; // Erro de rede/timeout
+    const res = await strictFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
     
-    if (res.status === 404) return true;  // Disponível
-    if (res.status === 200) return false; // Ocupado
-    if (res.status === 429) return 'LIMIT'; // Rate Limit
-    return null;
+    // REGRA DE OURO: Se deu erro de rede, timeout, ou rate limit -> DESCARTA (null)
+    if (!res) return null; 
+    
+    // Só retorna TRUE se for explicitamente 404 (Não Encontrado)
+    if (res.status === 404) return true;
+    
+    // Qualquer outra coisa (200, 429, 500) conta como Ocupado/Erro
+    return false;
 }
 
-// Verifica na LabyMod (Secundário/Rápido)
+// Verifica na LabyMod (Backup)
 async function labymod(nick) {
-    const res = await fastFetch(`https://laby.net/api/v3/user/${nick}`);
+    const res = await strictFetch(`https://laby.net/api/v3/user/${nick}`);
     if (!res) return null;
 
     if (res.status === 404) return true;
-    if (res.status === 200) return false;
-    return null;
+    return false;
 }
 
-// Lógica de Verificação Otimizada
 async function checkNickAvailability(nick) {
     // 1. Cache
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    // 2. Tenta Ashcon primeiro
+    // 2. Tenta Ashcon
     let result = await ashcon(nick);
 
-    // Se Ashcon bloqueou (429) ou deu erro, tenta LabyMod imediatamente
-    if (result === 'LIMIT' || result === null) {
+    // 3. Se Ashcon deu erro/ocupado/timeout, tenta a LabyMod como última chance?
+    // VOCÊ PEDIU: "Se der erro, descarta".
+    // Então, se o Ashcon falhar (retornar null ou false), a gente assume que já era.
+    // MAS, para garantir que não estamos perdendo nicks bons por falha momentânea da Ashcon,
+    // vamos testar no LabyMod APENAS se o Ashcon der "Erro de Rede" (null).
+    
+    if (result === null) {
         result = await labymod(nick);
     }
 
-    // Se ainda assim for null (as duas falharam), retorna false pra não travar
-    // (Ou seja, na dúvida, pula esse nick)
-    if (result === null) return false;
-
-    // Salva no cache se tiver certeza
-    if (result === true || result === false) {
-        cache.set(nick, result);
+    // Se depois disso o resultado não for EXPLICITAMENTE true (Disponível), descarta.
+    if (result !== true) {
+        result = false;
     }
 
+    cache.set(nick, result);
     return result;
 }
 
-// --- GERADOR (MANTIDO) ---
+// --- GERADOR DE NICKS (MANTIDO IGUAL) ---
 const genChars = {
     letters: 'abcdefghijklmnopqrstuvwxyz',
     letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
@@ -111,7 +116,7 @@ function generateNick(len, first, type, allowUnderscore) {
     return nick;
 }
 
-// --- UI CONTROL ---
+// --- INTERFACE (UI) ---
 let isRunning = false;
 let abort = false;
 
@@ -180,14 +185,13 @@ function addNick(nick) {
     updateActionButtons();
 }
 
-// --- CORE LOOP ---
 async function startGeneration() {
     if (isRunning) return;
     isRunning = true; abort = false;
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = '🚀 MODO TURBO INICIADO...';
+    ui.stats.textContent = '🕵️ MODO RIGOROSO ATIVADO...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -196,7 +200,7 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    // AQUI TÁ A MÁGICA: Aumentei drasticamente a concorrência
+    // Mantivemos a velocidade alta, pois agora o descarte é rápido
     const concurrency = isTurbo ? 60 : 5; 
 
     const seen = new Set();
@@ -204,17 +208,15 @@ async function startGeneration() {
     let attempts = 0;
     let startTime = Date.now();
 
-    // Atualiza Stats a cada 500ms
     const speedInterval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(attempts / elapsed);
-        ui.stats.textContent = `⚡ Check: ${attempts} | PPS: ${speed}/s | ✅ Achados: ${found}/${target}`;
+        ui.stats.textContent = `⚡ Verificados: ${attempts} | PPS: ${speed}/s | ✅ Válidos: ${found}/${target}`;
     }, 500);
 
     while (found < target && !abort) {
         const batch = [];
         
-        // Enche o lote até o talo
         while (batch.length < concurrency) {
             let nick = generateNick(len, first, charset, allowUnder);
             if (!seen.has(nick)) {
@@ -224,7 +226,6 @@ async function startGeneration() {
             if(seen.size > 100000) seen.clear();
         }
         
-        // Dispara todos de uma vez (Promise.all)
         const results = await Promise.all(batch.map(async (n) => {
             if (abort) return null;
             const free = await checkNickAvailability(n);
@@ -234,13 +235,13 @@ async function startGeneration() {
         attempts += batch.length;
 
         for (const res of results) {
+            // Só adiciona se for EXATAMENTE true (sem incertezas)
             if (res && res.free === true && found < target) {
                 found++;
                 addNick(res.nick);
             }
         }
         
-        // Removemos o delay grande. É só uma respiração minúscula pro navegador não travar.
         await sleep(isTurbo ? 5 : 100);
     }
 
@@ -254,7 +255,7 @@ function stopGeneration(completed = false) {
     ui.stop.disabled = true;
     
     if (completed) {
-        ui.stats.textContent = `🏆 Feito! ${ui.list.children.length} nicks salvos.`;
+        ui.stats.textContent = `✅ Finalizado! Lista gerada com rigor.`;
     } else {
         ui.stats.textContent += ' (Parado)';
     }
