@@ -17,36 +17,10 @@ async function ashcon(nick) {
     throw new Error(`Ashcon ${res.status}`);
 }
 
-async function mcapi(nick) {
-    const res = await fetch(`https://mcuser.net/api/server/user/${nick}`);
-    if (!res.ok) throw new Error('MCAPI Error');
-    const json = await res.json();
-    if (json.exists === false) return true;
-    if (json.exists === true) return false;
-    throw new Error('MCAPI Invalid JSON');
-}
-
-async function minetools(nick) {
-    const res = await fetch(`https://api.minetools.eu/uuid/${nick}`);
-    try {
-        const json = await res.json();
-        if (json.id) return false; 
-        if (json.status === 'ERR' && json.id === null) return true;
-        return true; 
-    } catch { throw new Error('Minetools Error'); }
-}
-
-async function mojang(nick) {
-    const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${nick}`, { mode: 'cors' });
-    if (res.status === 204 || res.status === 404) return true;
-    if (res.status === 200) return false;
-    throw new Error('Mojang Error');
-}
-
 async function labymod(nick) {
     const res = await fetch(`https://laby.net/api/v3/user/${nick}`);
-    if (res.status === 404) return true;
-    if (res.status === 200) return false;
+    if (res.status === 404) return true; 
+    if (res.status === 200) return false; 
     throw new Error('LabyMod Error');
 }
 
@@ -54,23 +28,22 @@ async function checkNickAvailability(nick) {
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    const checkers = [ashcon, minetools, labymod, mcapi];
-    
     try {
-        const selectedApis = checkers.sort(() => 0.5 - Math.random()).slice(0, 3);
-        const promises = selectedApis.map(api => api(nick).catch(e => null));
-        const results = await Promise.all(promises);
-
-        const isTaken = results.some(r => r === false);
+        const step1 = await ashcon(nick).catch(() => null);
         
-        if (isTaken) {
+        if (step1 === false) {
             cache.set(nick, false);
             return false;
         }
 
-        const confirmedFree = results.some(r => r === true);
+        const step2 = await labymod(nick).catch(() => null);
+        
+        if (step2 === false) {
+            cache.set(nick, false);
+            return false;
+        }
 
-        if (confirmedFree) {
+        if (step1 === true || step2 === true) {
             cache.set(nick, true);
             return true;
         }
@@ -200,7 +173,7 @@ async function startGeneration() {
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = 'Iniciando varredura...';
+    ui.stats.textContent = 'Iniciando alta velocidade...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -209,11 +182,19 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    const concurrency = isTurbo ? 4 : 1; 
+    const concurrency = isTurbo ? 25 : 2; 
 
     const seen = new Set();
     let found = 0;
     let attempts = 0;
+    let speed = 0;
+    let startTime = Date.now();
+
+    const speedInterval = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        speed = Math.round(attempts / elapsed);
+        ui.stats.textContent = `Checados: ${attempts} | PPS: ${speed}/s | Encontrados: ${found}/${target}`;
+    }, 1000);
 
     while (found < target && !abort) {
         const batch = [];
@@ -224,7 +205,7 @@ async function startGeneration() {
                 seen.add(nick);
                 batch.push(nick);
             }
-            if(seen.size > 10000) seen.clear();
+            if(seen.size > 20000) seen.clear();
         }
         
         const promises = batch.map(async (n) => {
@@ -242,12 +223,11 @@ async function startGeneration() {
                 addNick(res.nick);
             }
         }
-
-        ui.stats.textContent = `Verificados: ${attempts} | Encontrados: ${found}/${target}`;
         
-        await sleep(isTurbo ? 100 : 400);
+        if (!isTurbo) await sleep(150);
     }
 
+    clearInterval(speedInterval);
     stopGeneration(found >= target);
 }
 
