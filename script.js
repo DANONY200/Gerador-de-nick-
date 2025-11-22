@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-const sleep = (t = 5) => new Promise(r => setTimeout(r, t));
+const sleep = (t = 1) => new Promise(r => setTimeout(r, t));
 
 const cache = {
     get: nick => {
@@ -12,7 +12,7 @@ const cache = {
 
 async function quickFetch(url) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
 
     try {
         const res = await fetch(url, { signal: controller.signal });
@@ -24,24 +24,23 @@ async function quickFetch(url) {
     }
 }
 
+const apis = [
+    { url: 'https://api.ashcon.app/mojang/v2/user/', name: 'ashcon' },
+    { url: 'https://mush.com.br/api/player/', name: 'mush' }
+];
+
 async function checkNickAvailability(nick) {
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    let res = await quickFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
+    const mainApi = apis[Math.floor(Math.random() * apis.length)];
+    
+    let res = await quickFetch(mainApi.url + nick);
 
-    if (res) {
-        if (res.status === 404) {
-            cache.set(nick, true);
-            return true;
-        }
-        if (res.status === 200) {
-            cache.set(nick, false);
-            return false;
-        }
+    if (!res || res.status === 429 || res.status >= 500) {
+        const backupApi = apis.find(a => a.name !== mainApi.name);
+        res = await quickFetch(backupApi.url + nick);
     }
-
-    res = await quickFetch(`https://mush.com.br/api/player/${nick}`);
 
     if (res) {
         if (res.status === 404) {
@@ -141,7 +140,7 @@ ui.download.addEventListener('click', () => {
 function addNick(nick) {
     const li = document.createElement('li');
     li.dataset.nick = nick;
-    li.style.animation = "fadeIn 0.3s";
+    li.style.animation = "fadeIn 0.2s";
     
     const span = document.createElement('span');
     span.textContent = nick;
@@ -168,7 +167,7 @@ async function startGeneration() {
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = '🚀 BUSCANDO...';
+    ui.stats.textContent = '🚀 VELOCIDADE MÁXIMA...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -177,7 +176,7 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    const concurrency = isTurbo ? 100 : 10; 
+    const concurrency = isTurbo ? 150 : 20; 
 
     const seen = new Set();
     let found = 0;
@@ -199,7 +198,7 @@ async function startGeneration() {
                 seen.add(nick);
                 batch.push(nick);
             }
-            if(seen.size > 200000) seen.clear();
+            if(seen.size > 250000) seen.clear();
         }
         
         const results = await Promise.all(batch.map(async (n) => {
@@ -217,7 +216,7 @@ async function startGeneration() {
             }
         }
         
-        await sleep(isTurbo ? 1 : 20);
+        await sleep(0);
     }
 
     clearInterval(speedInterval);
