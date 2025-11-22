@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-const sleep = (t = 10) => new Promise(r => setTimeout(r, t));
+const sleep = (t = 5) => new Promise(r => setTimeout(r, t));
 
 const cache = {
     get: nick => {
@@ -10,7 +10,7 @@ const cache = {
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
-async function strictFetch(url) {
+async function quickFetch(url) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
@@ -24,46 +24,36 @@ async function strictFetch(url) {
     }
 }
 
-async function ashcon(nick) {
-    const res = await strictFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
-    if (!res) return null;
-    if (res.status === 404) return true;
-    if (res.status === 200) return false;
-    return null;
-}
-
-async function mush(nick) {
-    const res = await strictFetch(`https://mush.com.br/api/player/${nick}`);
-    if (!res) return null;
-    if (res.status === 404) return true;
-    if (res.status === 200) return false;
-    return null;
-}
-
-async function labymod(nick) {
-    const res = await strictFetch(`https://laby.net/api/v3/user/${nick}`);
-    if (!res) return null;
-    if (res.status === 404) return true;
-    if (res.status === 200) return false;
-    return null;
-}
-
 async function checkNickAvailability(nick) {
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    const [r1, r2, r3] = await Promise.all([
-        ashcon(nick),
-        mush(nick),
-        labymod(nick)
-    ]);
+    let res = await quickFetch(`https://api.ashcon.app/mojang/v2/user/${nick}`);
 
-    if (r1 === true && r2 === true && r3 === true) {
-        cache.set(nick, true);
-        return true;
+    if (res) {
+        if (res.status === 404) {
+            cache.set(nick, true);
+            return true;
+        }
+        if (res.status === 200) {
+            cache.set(nick, false);
+            return false;
+        }
     }
 
-    cache.set(nick, false);
+    res = await quickFetch(`https://mush.com.br/api/player/${nick}`);
+
+    if (res) {
+        if (res.status === 404) {
+            cache.set(nick, true);
+            return true;
+        }
+        if (res.status === 200) {
+            cache.set(nick, false);
+            return false;
+        }
+    }
+
     return false;
 }
 
@@ -143,7 +133,7 @@ ui.download.addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'nicks_validos.txt';
+    a.download = 'nicks_disponiveis.txt';
     a.click();
     URL.revokeObjectURL(url);
 });
@@ -154,7 +144,7 @@ function addNick(nick) {
     li.style.animation = "fadeIn 0.3s";
     
     const span = document.createElement('span');
-    span.innerHTML = `${nick}`;
+    span.textContent = nick;
     span.style.color = "#4ade80"; 
 
     const btn = document.createElement('button');
@@ -178,7 +168,7 @@ async function startGeneration() {
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = '🚀 Processando...';
+    ui.stats.textContent = '🚀 BUSCANDO...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -187,7 +177,7 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    const concurrency = isTurbo ? 80 : 10; 
+    const concurrency = isTurbo ? 100 : 10; 
 
     const seen = new Set();
     let found = 0;
@@ -209,7 +199,7 @@ async function startGeneration() {
                 seen.add(nick);
                 batch.push(nick);
             }
-            if(seen.size > 150000) seen.clear();
+            if(seen.size > 200000) seen.clear();
         }
         
         const results = await Promise.all(batch.map(async (n) => {
@@ -227,7 +217,7 @@ async function startGeneration() {
             }
         }
         
-        await sleep(isTurbo ? 5 : 50);
+        await sleep(isTurbo ? 1 : 20);
     }
 
     clearInterval(speedInterval);
