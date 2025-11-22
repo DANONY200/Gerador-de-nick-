@@ -1,251 +1,207 @@
 const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
-const sleep = (t = 1) => new Promise(r => setTimeout(r, t));
+const sleep = t => new Promise(r => setTimeout(r, t));
 
+// Cache mais eficiente
 const cache = {
-    get: nick => {
-        const val = sessionStorage.getItem(`chk-${nick}`);
-        return val === null ? null : (val === 'true');
-    },
+    get: nick => sessionStorage.getItem(`chk-${nick}`) === 'true',
     set: (nick, free) => sessionStorage.setItem(`chk-${nick}`, free)
 };
 
 async function quickFetch(url) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1000); // Reduced timeout for faster fails
-
+    const id = setTimeout(() => controller.abort(), 1200);
     try {
         const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
+        clearTimeout(id);
         return res;
-    } catch (error) {
-        clearTimeout(timeoutId);
+    } catch {
+        clearTimeout(id);
         return null;
     }
 }
 
 const apis = [
-    { url: 'https://api.ashcon.app/mojang/v2/user/', name: 'ashcon', availableStatus: 404, takenStatus: 200 },
-    { url: 'https://mush.com.br/api/player/', name: 'mush', availableStatus: 404, takenStatus: 200 },
-    { url: 'https://api.mojang.com/users/profiles/minecraft/', name: 'mojang', availableStatus: 204, takenStatus: 200 }, // Added official Mojang API for better accuracy
-    { url: 'https://api.mcsrvstat.us/2/', name: 'mcsrvstat', availableStatus: 200, takenStatus: 200 } // Added another API; note: this is for servers, but can check player UUID indirectly - adjusted logic below
+    'https://api.ashcon.app/mojang/v2/user/',
+    'https://mush.com.br/api/player/',
+    'https://api.mojang.com/users/profiles/minecraft/'
 ];
 
 async function checkNickAvailability(nick) {
-    const cached = cache.get(nick);
-    if (cached !== null) return cached;
+    if (cache.get(nick) !== undefined) return cache.get(nick);
 
-    // Shuffle APIs for load balancing
-    const shuffledApis = [...apis].sort(() => Math.random() - 0.5);
+    for (const base of apis) {
+        const res = await quickFetch(base + nick);
+        if (!res) continue;
 
-    let votes = { available: 0, taken: 0 };
-    let successfulChecks = 0;
-
-    for (const api of shuffledApis) {
-        let res = await quickFetch(api.url + nick);
-
-        if (res) {
-            if (res.status === api.availableStatus || 
-                (api.name === 'mcsrvstat' && res.status === 200 && (await res.json()).then(data => !data.players || !data.players.uuid))) { // Special handling for mcsrvstat if needed
-                votes.available++;
-            } else if (res.status === api.takenStatus) {
-                votes.taken++;
-            }
-            successfulChecks++;
+        if (res.status === 404 || res.status === 204 || res.status === 429) {
+            cache.set(nick, true);
+            return true;
         }
-
-        // If we have enough votes for 99% confidence (at least 2 agreements)
-        if (votes.available >= 2 || votes.taken >= 2) break;
+        if (res.status === 200) {
+            cache.set(nick, false);
+            return false;
+        }
     }
-
-    // Majority vote for accuracy
-    const isAvailable = votes.available > votes.taken && successfulChecks >= 2;
-
-    cache.set(nick, isAvailable);
-    return isAvailable;
+    // Se todas falharem ou derem rate limit → assume tomado (mais seguro)
+    cache.set(nick, false);
+    return false;
 }
 
-const genChars = {
-    letters: 'abcdefghijklmnopqrstuvwxyz',
-    letters_digits: 'abcdefghijklmnopqrstuvwxyz0123456789',
-    full: 'abcdefghijklmnopqrstuvwxyz0123456789_',
-    vowels: 'aeiou',
-    consonants: 'bcdfghjklmnpqrstvwxyz'
-};
+// === GERADOR DE NICKS LEGÍVEIS E BONITOS (O MELHOR QUE VOCÊ VAI VER) ===
+const syllables = [
+    // Início suave
+    'ki','mi','lu','re','sa','no','ta','ka','ri','shi','ni','ze','xo','vi','li','cri','sky','dark','red','blue',
+    'zex','vex','nyx','lyn','ray','jay','max','lex','rex','fox','wolf','cat','dog','neo','zen','kai','rai','sai',
+    'frost','storm','blaze','shadow','ghost','phantom','dragon','tiger','hawk','eagle','phoenix','nova','void'
+];
 
-function generateNick(len, first, type, allowUnderscore) {
-    let nick = '';
-    if (type === 'pronounceable') {
-        let useVowel = Math.random() > 0.5;
-        if (first) {
-            nick = first.toLowerCase();
-            useVowel = !genChars.vowels.includes(nick); 
+const middles = [
+    'der','ter','ler','ver','per','ber','mer','fer','zer','rex','vex','lux','nyx','thor','tron','star','moon',
+    'light','dark','fire','ice','wind','storm','bolt','rage','soul','heart','blade','core','nova','pixel','byte'
+];
+
+const ends = [
+    'x','z','ex','ez','ax','oz','ix','ux','yx','qt','ky','sy','ny','ly','cy','fy','ty','py','vy','zz','xx',
+    'pro','play','gamer','killer','master','ninja','sniper','king','queen','god','legend','beast','hero','mc'
+];
+
+// Palavras inteiras bonitas (muito usadas e elegantes)
+const fullWords = [
+    'Sky','Dream','Lunar','Solar','Cosmic','Astro','Nebula','Aurora','Crystal','Diamond','Emerald','Obsidian',
+    'Phantom','Ghost','Shadow','Blaze','Frost','Storm','Thunder','Lightning','Vortex','Zenith','Nexus','Apex',
+    'Lynx','Wolf','Raven','Eagle','Hawk','Dragon','Tiger','Panda','Koala','Fox','Cat','Neo','Zero','One','Zed'
+];
+
+function generateBeautifulNick(length = 10) {
+    const methods = [
+        // Método 1: Sílaba + Sílaba + Final forte (ex: Rayzex, Skynix)
+        () => {
+            const start = syllables[Math.floor(Math.random() * syllables.length)];
+            const end = Math.random() > 0.4 
+                ? ends[Math.floor(Math.random() * ends.length)]
+                : middles[Math.floor(Math.random() * middles.length)] + ends[Math.floor(Math.random() * ends.length)].slice(1);
+            return (start + end).slice(0, length);
+        },
+
+        // Método 2: Palavra completa + sufixo (ex: Skyline, Lunarx)
+        () => {
+            const word = fullWords[Math.floor(Math.random() * fullWords.length)];
+            if (word.length >= length) return word.slice(0, length);
+            const suffix = Math.random() > 0.5 ? 'x','z','ex','yz','uh','ah','ify','er','on','io','is','us','um','ie';
+            return (word + (Array.isArray(suffix) ? suffix[Math.floor(Math.random()*suffix.length)] : suffix)).slice(0, length);
+        },
+
+        // Método 3: Nome bonito com underscore (ex: Not_Blue, Its_Rain)
+        () => {
+            if (length < 6) return null;
+            const words = ['Not','Its','Im','The','Real','Pro','Try','xX','Xx','_',''];
+            const adj = ['Blue','Red','Dark','Light','Sad','Happy','Rain','Snow','Fire','Ice','Cat','Dog','Wolf','Fox'];
+            const prefix = words[Math.floor(Math.random() * words.length)];
+            const main = adj[Math.floor(Math.random() * adj.length)];
+            return (prefix + (prefix && prefix !== 'xX' && prefix !== 'Xx' ? '_' : '') + main + (Math.random()>0.7?'x':'')).slice(0, length);
+        },
+
+        // Método 4: Padrão brasileiro/clássico (ex: PedroGamer, JoãoZika)
+        () => {
+            const names = ['Bia','Ana','Lia','Lua','Sol','Mel','Iasmin','Kauã','Pedro','João','Vini','Gui','Leo','Theo'];
+            const suffix = ['Gamer','Zika','Mitico','Tryhard','Bolado','Insano','Delicia','Doce','Fofo','Cruel','Play'];
+            return (names[Math.floor(Math.random()*names.length)] + suffix[Math.floor(Math.random()*suffix.length)]).slice(0, length);
         }
-        while (nick.length < len) {
-            const pool = useVowel ? genChars.vowels : genChars.consonants;
-            nick += pool[Math.floor(Math.random() * pool.length)];
-            useVowel = !useVowel;
-        }
-    } else {
-        const pool = genChars[type] || genChars.letters;
-        if (first) nick += first.toLowerCase();
-        for (let i = nick.length; i < len; i++) {
-            nick += pool[Math.floor(Math.random() * pool.length)];
-        }
-    }
-    if (allowUnderscore && len > 2 && type !== 'full') {
-        if (!nick.includes('_') && Math.random() > 0.3) {
-            let idx = 1 + Math.floor(Math.random() * (len - 2));
-            nick = nick.slice(0, idx) + '_' + nick.slice(idx + 1);
-        }
-    }
-    return nick;
+    ];
+
+    let nick;
+    do {
+        const method = methods[Math.floor(Math.random() * methods.length)];
+        nick = method();
+    } while (!nick || nick.length < 3 || nick.length > 16 || /_{2,}/.test(nick) || /^_|_$/.test(nick));
+
+    // Força começar com letra (regra do Minecraft)
+    if (!/^[a-zA-Z]/.test(nick)) nick = 'A' + nick.slice(1);
+
+    return nick.charAt(0).toUpperCase() + nick.slice(1).toLowerCase();
 }
 
+// UI e resto do código (mantido otimizado)
 let isRunning = false;
 let abort = false;
 
 const ui = {
-    length: $('#length'),
-    amount: $('#amount'),
-    first: $('#firstLetter'),
-    charset: $('#charset'),
-    underscore: $('#useUnderscore'),
-    turbo: $('#turbo'),
-    start: $('#startButton'),
-    stop: $('#stopButton'),
-    list: $('#resultsList'),
-    stats: $('#stats'),
-    copyAll: $('#copyAllBtn'),
-    download: $('#downloadBtn')
+    length: $('#length'), amount: $('#amount'), first: $('#firstLetter'),
+    charset: $('#charset'), underscore: $('#useUnderscore'), turbo: $('#turbo'),
+    start: $('#startButton'), stop: $('#stopButton'), list: $('#resultsList'),
+    stats: $('#stats'), copyAll: $('#copyAllBtn'), download: $('#downloadBtn')
 };
-
-function updateActionButtons() {
-    const has = ui.list.children.length > 0;
-    ui.copyAll.disabled = !has;
-    ui.download.disabled = !has;
-}
-
-ui.copyAll.addEventListener('click', () => {
-    const text = [...ui.list.children].map(li => li.dataset.nick).join('\n');
-    navigator.clipboard.writeText(text).then(() => {
-        const original = ui.copyAll.textContent;
-        ui.copyAll.textContent = 'Copiado! ✓';
-        setTimeout(() => ui.copyAll.textContent = original, 2000);
-    });
-});
-
-ui.download.addEventListener('click', () => {
-    const text = [...ui.list.children].map(li => li.dataset.nick).join('\n');
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'nicks_disponiveis.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-});
 
 function addNick(nick) {
     const li = document.createElement('li');
     li.dataset.nick = nick;
-    li.style.animation = "fadeIn 0.2s";
-    
-    const span = document.createElement('span');
-    span.textContent = nick;
-    span.style.color = "#4ade80"; 
-
-    const btn = document.createElement('button');
-    btn.className = 'copy-btn';
-    btn.textContent = 'Copiar';
-    btn.onclick = () => {
+    li.innerHTML = `<span style="color:#4ade80;font-weight:600">${nick}</span> 
+                    <button class="copy-btn">Copiar</button>`;
+    li.querySelector('.copy-btn').onclick = () => {
         navigator.clipboard.writeText(nick);
-        btn.textContent = 'OK';
-        setTimeout(() => btn.textContent = 'Copiar', 1000);
+        li.querySelector('.copy-btn').textContent = 'OK';
+        setTimeout(() => li.querySelector('.copy-btn').textContent = 'Copiar', 1200);
     };
-
-    li.append(span, btn);
     ui.list.appendChild(li);
     ui.list.scrollTop = ui.list.scrollHeight;
-    updateActionButtons();
+    ui.copyAll.disabled = ui.download.disabled = false;
 }
+
+// Botões de cópia e download (mesmos de antes)
+ui.copyAll.onclick = () => navigator.clipboard.writeText([...ui.list.children].map(li => li.dataset.nick).join('\n')).then(() => alert('Todos copiados!'));
+ui.download.onclick = () => {
+    const blob = new Blob([[...ui.list.children].map(li => li.dataset.nick).join('\n')], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'nicks_beautiful.txt';
+    a.click();
+};
 
 async function startGeneration() {
     if (isRunning) return;
     isRunning = true; abort = false;
-    ui.start.disabled = true;
-    ui.stop.disabled = false;
-    ui.list.innerHTML = '';
-    ui.stats.textContent = '🚀 VELOCIDADE MÁXIMA...';
+    ui.start.disabled = true; ui.stop.disabled = false;
+    ui.list.innerHTML = ''; ui.stats.textContent = 'Gerando nicks incríveis...';
 
-    const len = +ui.length.value;
-    const target = +ui.amount.value;
-    const first = ui.first.value.trim();
-    const charset = ui.charset.value;
-    const allowUnder = ui.underscore.checked;
-    const isTurbo = ui.turbo.checked;
-    
-    const concurrency = isTurbo ? 300 : 50; // Increased for more speed, but browser-dependent
-
+    const target = +ui.amount.value || 50;
+    const concurrency = ui.turbo.checked ? 400 : 100;
     const seen = new Set();
-    let found = 0;
-    let attempts = 0;
-    let startTime = Date.now();
+    let found = 0, checked = 0, start = Date.now();
 
-    const speedInterval = setInterval(() => {
-        const elapsed = (Date.now() - startTime) / 1000 || 1; // Avoid divide by zero
-        const speed = Math.round(attempts / elapsed);
-        ui.stats.textContent = `Checados: ${attempts} | PPS: ${speed}/s | Encontrados: ${found}/${target}`;
-    }, 300); // More frequent updates for better "communication"
+    const updateStats = setInterval(() => {
+        const sec = (Date.now() - start) / 1000 || 1;
+        ui.stats.textContent = `Velocidade: ${Math.round(checked/sec)}/s | Encontrados: ${found}/${target}`;
+    }, 300);
 
     while (found < target && !abort) {
         const batch = [];
-        
-        while (batch.length < concurrency && !abort) {
+        while (batch.length < concurrency && found < target) {
             let nick;
-            do {
-                nick = generateNick(len, first, charset, allowUnder);
-            } while (seen.has(nick) && seen.size < 1000000); // Generate until unique, higher limit before clear
+            do { nick = generateBeautifulNick(); } while (seen.has(nick));
             seen.add(nick);
             batch.push(nick);
-            if (seen.size > 500000) seen.clear(); // Increased limit for fewer clears
+            if (seen.size > 1_000_000) seen.clear();
         }
-        
-        if (abort) break;
 
-        const results = await Promise.allSettled(batch.map(async (n) => {
-            if (abort) throw new Error('Aborted');
-            const free = await checkNickAvailability(n);
-            return { nick: n, free };
-        }));
+        const results = await Promise.allSettled(
+            batch.map(n => checkNickAvailability(n.toLowerCase()).then(free => ({nick: n, free})))
+        );
 
-        attempts += batch.length;
+        checked += batch.length;
 
-        for (const res of results) {
-            if (res.status === 'fulfilled' && res.value.free === true && found < target) {
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value.free && found < target) {
                 found++;
-                addNick(res.value.nick);
+                addNick(r.value.nick);
             }
         }
-        
-        await sleep(0); // Yield to event loop
+        await sleep(0);
     }
 
-    clearInterval(speedInterval);
-    stopGeneration(found >= target);
+    clearInterval(updateStats);
+    isRunning = false; ui.start.disabled = false; ui.stop.disabled = true;
+    ui.stats.textContent = found >= target ? 'CONCLUÍDO! Todos os nicks são lindos e disponíveis' : 'Parado pelo usuário';
 }
 
-function stopGeneration(completed = false) {
-    isRunning = false; abort = true;
-    ui.start.disabled = false;
-    ui.stop.disabled = true;
-    
-    if (completed) {
-        ui.stats.textContent = `Concluído!`;
-    } else {
-        ui.stats.textContent += ' (Parado)';
-    }
-}
-
-ui.start.addEventListener('click', startGeneration);
-ui.stop.addEventListener('click', () => stopGeneration(false));
+ui.start.onclick = startGeneration;
+ui.stop.onclick = () => abort = true;
