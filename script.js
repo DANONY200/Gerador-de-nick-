@@ -12,7 +12,7 @@ const cache = {
 
 async function strictFetch(url) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     try {
         const res = await fetch(url, { signal: controller.signal });
@@ -52,26 +52,19 @@ async function checkNickAvailability(nick) {
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    const r1 = await ashcon(nick);
-    if (r1 !== true) {
-        cache.set(nick, false);
-        return false; 
+    const [r1, r2, r3] = await Promise.all([
+        ashcon(nick),
+        mush(nick),
+        labymod(nick)
+    ]);
+
+    if (r1 === true && r2 === true && r3 === true) {
+        cache.set(nick, true);
+        return true;
     }
 
-    const r2 = await mush(nick);
-    if (r2 !== true) {
-        cache.set(nick, false);
-        return false; 
-    }
-
-    const r3 = await labymod(nick);
-    if (r3 !== true) {
-        cache.set(nick, false);
-        return false; 
-    }
-
-    cache.set(nick, true);
-    return true;
+    cache.set(nick, false);
+    return false;
 }
 
 const genChars = {
@@ -150,7 +143,7 @@ ui.download.addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'nicks_validos_auditados.txt';
+    a.download = 'nicks_validos.txt';
     a.click();
     URL.revokeObjectURL(url);
 });
@@ -161,7 +154,7 @@ function addNick(nick) {
     li.style.animation = "fadeIn 0.3s";
     
     const span = document.createElement('span');
-    span.innerHTML = `${nick} <small style="font-size:0.7em; color:#fff; opacity:0.5;">(Auditado 3x)</small>`;
+    span.innerHTML = `${nick}`;
     span.style.color = "#4ade80"; 
 
     const btn = document.createElement('button');
@@ -185,7 +178,7 @@ async function startGeneration() {
     ui.start.disabled = true;
     ui.stop.disabled = false;
     ui.list.innerHTML = '';
-    ui.stats.textContent = '🛡️ INICIANDO AUDITORIA TRIPLA...';
+    ui.stats.textContent = '🚀 Processando...';
 
     const len = +ui.length.value;
     const target = +ui.amount.value;
@@ -194,7 +187,7 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    const concurrency = isTurbo ? 50 : 5; 
+    const concurrency = isTurbo ? 80 : 10; 
 
     const seen = new Set();
     let found = 0;
@@ -204,7 +197,7 @@ async function startGeneration() {
     const speedInterval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(attempts / elapsed);
-        ui.stats.textContent = `🔎 Analisados: ${attempts} | PPS: ${speed}/s | ⭐ Aprovados: ${found}/${target}`;
+        ui.stats.textContent = `Checados: ${attempts} | PPS: ${speed}/s | Encontrados: ${found}/${target}`;
     }, 500);
 
     while (found < target && !abort) {
@@ -234,7 +227,7 @@ async function startGeneration() {
             }
         }
         
-        await sleep(isTurbo ? 10 : 100);
+        await sleep(isTurbo ? 5 : 50);
     }
 
     clearInterval(speedInterval);
@@ -247,7 +240,7 @@ function stopGeneration(completed = false) {
     ui.stop.disabled = true;
     
     if (completed) {
-        ui.stats.textContent = `✅ Auditoria Finalizada!`;
+        ui.stats.textContent = `Concluído!`;
     } else {
         ui.stats.textContent += ' (Parado)';
     }
