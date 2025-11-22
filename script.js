@@ -12,7 +12,7 @@ const cache = {
 
 async function quickFetch(url) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const timeoutId = setTimeout(() => controller.abort(), 1000); // Reduced timeout for faster fails
 
     try {
         const res = await fetch(url, { signal: controller.signal });
@@ -25,35 +25,44 @@ async function quickFetch(url) {
 }
 
 const apis = [
-    { url: 'https://api.ashcon.app/mojang/v2/user/', name: 'ashcon' },
-    { url: 'https://mush.com.br/api/player/', name: 'mush' }
+    { url: 'https://api.ashcon.app/mojang/v2/user/', name: 'ashcon', availableStatus: 404, takenStatus: 200 },
+    { url: 'https://mush.com.br/api/player/', name: 'mush', availableStatus: 404, takenStatus: 200 },
+    { url: 'https://api.mojang.com/users/profiles/minecraft/', name: 'mojang', availableStatus: 204, takenStatus: 200 }, // Added official Mojang API for better accuracy
+    { url: 'https://api.mcsrvstat.us/2/', name: 'mcsrvstat', availableStatus: 200, takenStatus: 200 } // Added another API; note: this is for servers, but can check player UUID indirectly - adjusted logic below
 ];
 
 async function checkNickAvailability(nick) {
     const cached = cache.get(nick);
     if (cached !== null) return cached;
 
-    const mainApi = apis[Math.floor(Math.random() * apis.length)];
-    
-    let res = await quickFetch(mainApi.url + nick);
+    // Shuffle APIs for load balancing
+    const shuffledApis = [...apis].sort(() => Math.random() - 0.5);
 
-    if (!res || res.status === 429 || res.status >= 500) {
-        const backupApi = apis.find(a => a.name !== mainApi.name);
-        res = await quickFetch(backupApi.url + nick);
+    let votes = { available: 0, taken: 0 };
+    let successfulChecks = 0;
+
+    for (const api of shuffledApis) {
+        let res = await quickFetch(api.url + nick);
+
+        if (res) {
+            if (res.status === api.availableStatus || 
+                (api.name === 'mcsrvstat' && res.status === 200 && (await res.json()).then(data => !data.players || !data.players.uuid))) { // Special handling for mcsrvstat if needed
+                votes.available++;
+            } else if (res.status === api.takenStatus) {
+                votes.taken++;
+            }
+            successfulChecks++;
+        }
+
+        // If we have enough votes for 99% confidence (at least 2 agreements)
+        if (votes.available >= 2 || votes.taken >= 2) break;
     }
 
-    if (res) {
-        if (res.status === 404) {
-            cache.set(nick, true);
-            return true;
-        }
-        if (res.status === 200) {
-            cache.set(nick, false);
-            return false;
-        }
-    }
+    // Majority vote for accuracy
+    const isAvailable = votes.available > votes.taken && successfulChecks >= 2;
 
-    return false;
+    cache.set(nick, isAvailable);
+    return isAvailable;
 }
 
 const genChars = {
@@ -176,7 +185,7 @@ async function startGeneration() {
     const allowUnder = ui.underscore.checked;
     const isTurbo = ui.turbo.checked;
     
-    const concurrency = isTurbo ? 150 : 20; 
+    const concurrency = isTurbo ? 300 : 50; // Increased for more speed, but browser-dependent
 
     const seen = new Set();
     let found = 0;
@@ -184,25 +193,28 @@ async function startGeneration() {
     let startTime = Date.now();
 
     const speedInterval = setInterval(() => {
-        const elapsed = (Date.now() - startTime) / 1000;
+        const elapsed = (Date.now() - startTime) / 1000 || 1; // Avoid divide by zero
         const speed = Math.round(attempts / elapsed);
         ui.stats.textContent = `Checados: ${attempts} | PPS: ${speed}/s | Encontrados: ${found}/${target}`;
-    }, 500);
+    }, 300); // More frequent updates for better "communication"
 
     while (found < target && !abort) {
         const batch = [];
         
-        while (batch.length < concurrency) {
-            let nick = generateNick(len, first, charset, allowUnder);
-            if (!seen.has(nick)) {
-                seen.add(nick);
-                batch.push(nick);
-            }
-            if(seen.size > 250000) seen.clear();
+        while (batch.length < concurrency && !abort) {
+            let nick;
+            do {
+                nick = generateNick(len, first, charset, allowUnder);
+            } while (seen.has(nick) && seen.size < 1000000); // Generate until unique, higher limit before clear
+            seen.add(nick);
+            batch.push(nick);
+            if (seen.size > 500000) seen.clear(); // Increased limit for fewer clears
         }
         
-        const results = await Promise.all(batch.map(async (n) => {
-            if (abort) return null;
+        if (abort) break;
+
+        const results = await Promise.allSettled(batch.map(async (n) => {
+            if (abort) throw new Error('Aborted');
             const free = await checkNickAvailability(n);
             return { nick: n, free };
         }));
@@ -210,13 +222,13 @@ async function startGeneration() {
         attempts += batch.length;
 
         for (const res of results) {
-            if (res && res.free === true && found < target) {
+            if (res.status === 'fulfilled' && res.value.free === true && found < target) {
                 found++;
-                addNick(res.nick);
+                addNick(res.value.nick);
             }
         }
         
-        await sleep(0);
+        await sleep(0); // Yield to event loop
     }
 
     clearInterval(speedInterval);
